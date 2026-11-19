@@ -29,6 +29,15 @@ A minimal, JUST ONE HTML FILE Obsidian-compatible Markdown editor that works dir
 - **Data safety** - verified read-back writes, external conflict detection, preserved `CRLF`/`LF` & UTF-8 BOM, local recovery snapshots with diff/restore, and `.trash` folder support.
 - **Everyday workflow** - daily notes (`Alt+D`), drag-and-drop task/list reordering, paste formatted text/tables or images, rich-text copy, and multiple vaults via browser tabs.
 
+## Other projects
+
+- [AivoRelay](https://github.com/MaxITService/AIVORelay) — AI voice dictation and text-to-speech for Windows.
+- [OneClickPrompts](https://github.com/MaxITService/OneClickPrompts) — reusable prompt buttons for AI chats.
+- [Console2Ai](https://github.com/MaxITService/Console2Ai) — send a PowerShell buffer to AI.
+- [Mouse & Key Studio](https://github.com/MaxITService/MouseKeyStudio) — Logitech device settings, button remapping and macros for Windows.
+- [Ping-Plotter](https://github.com/MaxITService/Ping-Plotter-PS51) — a PowerShell ping plotting script.
+- [AI for Complete Beginners](https://medium.com/@maxim.fomins/ai-for-complete-beginners-guide-llms-f19c4b8a8a79) — an introductory guide to LLMs.
+
 ## License
 
 Maxidian is free software, licensed under the [GNU General Public License v3.0](LICENSE). Copyright (c) 2026 Maxim Fomin.
