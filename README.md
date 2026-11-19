@@ -1,19 +1,16 @@
 # Maxidian
 
-A minimal, single-file Obsidian-compatible Markdown editor that works directly in and from your browser (`file://`) - completely offline, with no installer, no server, and no network access. Built for locked-down or air-gapped machines with restricted internet access.
+A minimal, JUST ONE HTML FILE Obsidian-compatible Markdown editor that works directly in and from your browser (`file://`) - completely offline, with no installer, no server, and no network access. Built for locked-down or air-gapped machines with restricted internet access.
 
 ## Quick Start
 
-1. Download or open [`maxidian.html`](maxidian.html) in **Edge** or **Chrome**.
+1. Download or open [`maxidian.html`](https://github.com/MaxITService/Maxidian/releases/latest/download/maxidian.html) in **Edge** or **Chrome**.
 2. Click **Open vault folder...**, select your local Obsidian vault, and grant folder access.
 3. Read, edit, and search your notes in place - all offline.
 
 > Your `.obsidian/` folder is strictly **read-only** in Maxidian. App settings, private favorites overrides, and recovery snapshots live in `.maxidian/`.
 
 ## Screenshots
-
-### Note (Reading View)
-![Note reading view with folders and theme](promo/note.png)
 
 ### Editing (Live Preview)
 ![Live Preview editing view](promo/editing.png)
@@ -31,6 +28,10 @@ A minimal, single-file Obsidian-compatible Markdown editor that works directly i
 - **Data safety** - verified read-back writes, external conflict detection, preserved `CRLF`/`LF` & UTF-8 BOM, local recovery snapshots with diff/restore, and `.trash` folder support.
 - **Everyday workflow** - daily notes (`Alt+D`), drag-and-drop task/list reordering, paste formatted text/tables or images, rich-text copy, and multiple vaults via browser tabs.
 
-## Licenses
+## License
+
+Maxidian is free software, licensed under the [GNU General Public License v3.0](LICENSE). Copyright (c) 2026 Maxim Fomin.
+
+## Third-Party Licenses
 
 Maxidian bundles open-source third-party libraries and themes directly inside `maxidian.html`. See [docs/LICENSES.md](docs/LICENSES.md) for the full list and license texts.
