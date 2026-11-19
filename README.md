@@ -1,4 +1,5 @@
 # Maxidian
+[![Hits](https://hits.sh/github.com/MaxITService/Maxidian.svg?style=flat)](https://hits.sh/github.com/MaxITService/Maxidian/)
 
 A minimal, JUST ONE HTML FILE Obsidian-compatible Markdown editor that works directly in and from your browser (`file://`) - completely offline, with no installer, no server, and no network access. Built for locked-down or air-gapped machines with restricted internet access.
 
