@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <!--
   Maxidian - minimal offline Obsidian-style editor (single file, no network).
+  Copyright (c) 2026 Maxim Fomin. Licensed under the GNU General Public License v3.0 (GPL-3.0);
+  full text: https://www.gnu.org/licenses/gpl-3.0.html
   Bundled third-party code (licenses kept in their headers / repo src/vendor):
     AnuPpuccin theme (c) AnubisNekhet, GPL-3.0 - https://github.com/AnubisNekhet/AnuPpuccin
     marked (c) Christopher Jeffrey and contributors, MIT
@@ -202,7 +204,7 @@ input[type=text]:focus, select.dropdown:focus { border-color: var(--interactive-
 .clickable-icon:hover { background: var(--background-modifier-hover); opacity: var(--icon-opacity-hover); color: var(--icon-color-hover); }
 .clickable-icon.is-active { color: var(--icon-color-active); }
 /* Reveal in file tree flashes the note; the spellcheck button shows when it is on. */
-.nav-file-title.is-flashing { background: var(--nav-item-background-active); box-shadow: 0 0 0 1px var(--text-accent); }
+.nav-file-title.is-flashing, .nav-folder-title.is-flashing { background: var(--nav-item-background-active); box-shadow: 0 0 0 1px var(--text-accent); }
 .view-action.mx-act-spell.is-active { background: var(--background-modifier-hover); color: var(--text-accent); }
 
 /* ---------- layout ---------- */
@@ -338,7 +340,7 @@ input[type=text]:focus, select.dropdown:focus { border-color: var(--interactive-
 .markdown-preview-view.is-readable-line-width .markdown-preview-sizer { max-width: var(--file-line-width); margin: 0 auto; padding-bottom: 40vh; }
 .markdown-source-view { padding: var(--file-margins); background: var(--background-primary); cursor: text; }
 /* CodeMirror 6 (source + Live Preview) */
-.markdown-source-view.mod-cm6 .cm-editor { max-width: var(--file-line-width); margin: 0 auto; background: transparent; color: var(--text-normal); }
+.markdown-source-view.mod-cm6 .cm-editor { max-width: var(--file-line-width); margin: 0 auto; background: transparent; color: var(--text-normal); overflow: visible; }
 .markdown-source-view.mod-cm6 .cm-editor.cm-focused { outline: none; }
 .markdown-source-view.mod-cm6 .cm-scroller { font-family: var(--font-text); font-size: var(--font-text-size); line-height: var(--line-height-normal); overflow: visible; }
 .markdown-source-view.mod-cm6 .cm-content { min-width: 0; padding: 0 0 40vh; min-height: 60vh; caret-color: var(--text-accent); }
@@ -353,7 +355,190 @@ input[type=text]:focus, select.dropdown:focus { border-color: var(--interactive-
 .markdown-source-view.mod-cm6 .cm-cursor { border-left-color: var(--text-accent); border-left-width: 2px; }
 .markdown-source-view.mod-cm6 .cm-selectionBackground, .markdown-source-view.mod-cm6 .cm-focused .cm-selectionBackground { background: var(--text-selection) !important; }
 .markdown-source-view.mod-cm6 .cm-panels { background: var(--background-secondary); color: var(--text-normal); border-color: var(--background-modifier-border); }
-.markdown-source-view.mod-cm6 .cm-searchMatch { background: rgba(var(--color-yellow-rgb, 255, 200, 0), .35); }
+.markdown-source-view.mod-cm6 .cm-searchMatch {
+  background: color-mix(in srgb, var(--mx-find-color, #f5b800) 28%, transparent);
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.markdown-source-view.mod-cm6 .cm-searchMatch-selected {
+  background: color-mix(in srgb, var(--mx-find-color, #f5b800) 72%, transparent);
+  color: var(--text-normal);
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mx-find-color, #f5b800) 92%, var(--text-normal));
+  position: relative;
+  z-index: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .markdown-source-view.mod-cm6 .cm-searchMatch-selected.mx-find-pulse-a { animation: mx-find-pop-a 260ms cubic-bezier(.2, .8, .2, 1); }
+  .markdown-source-view.mod-cm6 .cm-searchMatch-selected.mx-find-pulse-b { animation: mx-find-pop-b 260ms cubic-bezier(.2, .8, .2, 1); }
+}
+@keyframes mx-find-pop-a {
+  0% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--mx-find-color, #f5b800) 65%, transparent); }
+  100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--mx-find-color, #f5b800) 92%, var(--text-normal)); }
+}
+@keyframes mx-find-pop-b {
+  0% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--mx-find-color, #f5b800) 65%, transparent); }
+  100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--mx-find-color, #f5b800) 92%, var(--text-normal)); }
+}
+
+/* Floating on-page Find & Replace card (64-find.js): zero-height sticky anchor -> zero layout jump.
+   top: 20px offsets margin-top: -12px so the card sits 8px below the top edge when scrolled (never clipped) and 20px at scrollTop 0. */
+.mx-find-anchor {
+  position: sticky; top: 20px; height: 0; overflow: visible; z-index: 30;
+  display: flex; justify-content: flex-end; align-items: flex-start; pointer-events: none;
+}
+.cm-search.mx-find {
+  pointer-events: auto;
+  width: min(392px, 100%);
+  box-sizing: border-box;
+  margin-top: -12px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--background-primary) 94%, var(--background-secondary));
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .16), 0 2px 6px rgba(0, 0, 0, .08);
+  color: var(--text-normal);
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-small);
+  opacity: 0;
+  transform: translateY(-6px) scale(.985);
+  transition: opacity 150ms cubic-bezier(.2, .7, .2, 1), transform 150ms cubic-bezier(.2, .7, .2, 1);
+}
+.cm-search.mx-find.is-open { opacity: 1; transform: translateY(0) scale(1); }
+.cm-search.mx-find.is-closing { pointer-events: none; opacity: 0; transform: translateY(-5px) scale(.985); }
+.mx-find-row { display: flex; align-items: center; gap: 4px; }
+.mx-find-input-wrap {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px;
+  padding: 0 8px; height: 28px; border-radius: 8px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  transition: border-color 120ms, box-shadow 120ms;
+}
+.mx-find-input-wrap:focus-within {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 22%, transparent);
+}
+.mx-find-input {
+  flex: 1; min-width: 0; width: 100%; border: 0 !important; background: transparent !important;
+  box-shadow: none !important; outline: none !important; padding: 0 !important; height: 26px !important;
+  color: var(--text-normal); font-size: var(--font-ui-small);
+}
+.mx-find-replace .mx-find-input {
+  height: 28px !important; padding: 0 8px !important; border-radius: 8px !important;
+  background: var(--background-secondary) !important;
+  border: 1px solid var(--background-modifier-border) !important;
+}
+.mx-find-replace .mx-find-input:focus {
+  border-color: var(--interactive-accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 22%, transparent) !important;
+}
+.mx-find-count {
+  flex: none; font-size: 11px; font-variant-numeric: tabular-nums;
+  color: var(--text-muted); padding: 1px 5px; border-radius: 6px;
+  background: color-mix(in srgb, var(--background-modifier-hover) 80%, transparent);
+  white-space: nowrap;
+}
+.mx-find-count:empty { display: none; }
+.mx-find-count.is-empty, .mx-find-count.is-error {
+  color: var(--text-error);
+  background: color-mix(in srgb, var(--text-error) 12%, transparent);
+}
+.mx-find-btn {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px !important; min-height: 0 !important; min-width: 0 !important;
+  padding: 0 !important; border: 0 !important; border-radius: 7px !important;
+  background: transparent !important; box-shadow: none !important; color: var(--text-muted); cursor: pointer;
+  transition: background-color 110ms, color 110ms, transform 140ms;
+}
+.mx-find-btn:hover:not(:disabled) { background: var(--background-modifier-hover) !important; color: var(--text-normal); }
+.mx-find-btn:disabled { opacity: .35; cursor: default; }
+.mx-find-btn svg { width: 15px; height: 15px; }
+.mx-find-chevron svg { transition: transform 160ms cubic-bezier(.2, .7, .2, 1); }
+.mx-find-chevron.is-open svg { transform: rotate(90deg); }
+.mx-find-opts { margin-top: 6px; gap: 6px; flex-wrap: wrap; }
+.mx-find-toggles { display: inline-flex; gap: 2px; background: var(--background-secondary); padding: 2px; border-radius: 7px; border: 1px solid var(--background-modifier-border); }
+.mx-find-opt {
+  height: 20px !important; min-height: 0 !important; min-width: 24px; padding: 0 5px !important; border: 0 !important; border-radius: 5px !important;
+  background: transparent !important; box-shadow: none !important; color: var(--text-muted);
+  font-size: 11px; font-weight: 600; font-family: var(--font-monospace); cursor: pointer;
+  transition: background-color 110ms, color 110ms;
+}
+.mx-find-opt:hover { color: var(--text-normal); background: var(--background-modifier-hover) !important; }
+.mx-find-opt.is-active { background: var(--interactive-accent) !important; color: var(--text-on-accent) !important; }
+.mx-find-chk {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--text-muted);
+  cursor: pointer; user-select: none; white-space: nowrap;
+}
+.mx-find-chk:hover { color: var(--text-normal); }
+.mx-find-chk input[type="checkbox"] { margin: 0; width: 13px; height: 13px; accent-color: var(--interactive-accent); cursor: pointer; }
+.mx-find-color-btn { margin-left: auto; }
+.mx-find-color-dot {
+  width: 14px; height: 14px; border-radius: 999px; display: block;
+  border: 1.5px solid color-mix(in srgb, var(--text-normal) 30%, transparent);
+  box-shadow: 0 0 0 1px var(--background-primary);
+}
+.mx-find-palette {
+  display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 6px 8px;
+  border-radius: 8px; background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+.mx-find-palette[hidden] { display: none; }
+.mx-find-palette-label { font-size: 11px; color: var(--text-muted); margin-right: 2px; }
+.mx-find-swatch {
+  flex: none; width: 18px !important; height: 18px !important; min-width: 0 !important; min-height: 0 !important;
+  padding: 0 !important; border-radius: 999px !important;
+  border: 1.5px solid color-mix(in srgb, var(--text-normal) 22%, transparent) !important;
+  box-shadow: none !important; cursor: pointer; transition: transform 110ms, box-shadow 110ms;
+}
+.mx-find-swatch:hover { transform: scale(1.12); }
+.mx-find-swatch.is-active { box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 3.5px var(--interactive-accent) !important; }
+.mx-find-custom-wrap { display: inline-flex; align-items: center; margin-left: auto; }
+.mx-find-color-custom {
+  width: 22px; height: 22px; padding: 0; border: 1px solid var(--background-modifier-border);
+  border-radius: 6px; background: transparent; cursor: pointer;
+}
+.mx-find-settings-colors { display: flex; align-items: center; gap: 7px; }
+.mx-find-replace-wrap {
+  display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden; margin-top: 0;
+  transition: grid-template-rows 160ms cubic-bezier(.2, .7, .2, 1), opacity 140ms ease, margin-top 160ms ease, visibility 0s linear 160ms;
+}
+.mx-find-replace-wrap.is-open {
+  grid-template-rows: 1fr; opacity: 1; visibility: visible; margin-top: 6px;
+  transition: grid-template-rows 160ms cubic-bezier(.2, .7, .2, 1), opacity 140ms ease, margin-top 160ms ease, visibility 0s;
+}
+.mx-find-replace { min-height: 0; overflow: hidden; padding-left: 30px; }
+.mx-find-act {
+  flex: none; height: 28px !important; min-height: 0 !important; padding: 0 9px !important; border-radius: 7px !important;
+  font-size: 11.5px; font-weight: 500; cursor: pointer;
+}
+.mx-find-act:disabled { opacity: .45; cursor: default; }
+.mx-find-act:disabled:hover { background: var(--interactive-normal); }
+
+/* Optimistic pending rename row + subtle spinner */
+.nav-file-title.is-renaming, .nav-folder-title.is-renaming, .view-header-title.is-renaming {
+  opacity: .68; pointer-events: none;
+}
+.mx-spinner {
+  flex: none; width: 13px; height: 13px; margin-inline-start: auto;
+  border: 1.75px solid color-mix(in srgb, var(--text-muted) 32%, transparent);
+  border-top-color: var(--interactive-accent);
+  border-radius: 999px;
+  animation: mx-spin 700ms linear infinite;
+}
+#st-save.is-saving::before {
+  width: 10px; height: 10px; background: transparent;
+  border: 1.5px solid color-mix(in srgb, currentColor 32%, transparent);
+  border-top-color: currentColor;
+  animation: mx-spin 700ms linear infinite;
+}
+@keyframes mx-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .cm-search.mx-find, .mx-find-replace-wrap, .mx-find-chevron svg, .mx-find-swatch { transition: none !important; }
+  .mx-find-swatch:hover { transform: none; }
+  .mx-spinner, #st-save.is-saving::before { animation: none; opacity: .7; }
+}
 .cm-formatting:not(:where(.mx-plain-br > *)) { color: var(--text-faint); }   /* [text] without a reference definition is plain text */
 .cm-strong { font-weight: var(--bold-weight, 700); }
 .cm-em { font-style: italic; }
@@ -378,8 +563,7 @@ input[type=text]:focus, select.dropdown:focus { border-color: var(--interactive-
 .cm-line .list-bullet { cursor: grab; }
 .mx-list-dragging, .mx-list-dragging * { cursor: grabbing !important; }
 .mx-drop-caret { position: fixed; width: 2px; pointer-events: none; z-index: 9998; background: var(--interactive-accent); }
-.cm-line.mx-drop-before { box-shadow: inset 0 2px var(--interactive-accent); }
-.cm-line.mx-drop-after { box-shadow: inset 0 -2px var(--interactive-accent); }
+.mx-list-drop { position: fixed; height: 2px; border-radius: 1px; pointer-events: none; z-index: 9998; background: var(--interactive-accent); }
 .HyperMD-task-line[data-task="x"], .HyperMD-task-line[data-task="X"] { color: var(--checklist-done-color, var(--text-muted)); opacity: var(--mx-checked-opacity, 1); }
 .is-live-preview .mx-task-done { text-decoration: var(--checklist-done-decoration, line-through); }
 body.mx-checked-no-strike .is-live-preview .mx-task-done { text-decoration: none; }
@@ -799,12 +983,13 @@ input.task-list-item-checkbox:checked::after {
 }
 .mx-hotkeys td { padding: 3px 12px 3px 0; font-size: var(--font-ui-small); }
 .mx-hotkeys kbd { white-space: nowrap; }
-.mx-hk-help { color: var(--text-muted); font-size: var(--font-ui-smaller); }
-.mx-hk-group { margin: 14px 0 4px; font-weight: var(--font-semibold); color: var(--text-muted); font-size: var(--font-ui-small); text-transform: uppercase; letter-spacing: .04em; }
+.mx-hk-help, .mx-help-intro { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.mx-hk-group, .mx-help-group { margin: 14px 0 4px; font-weight: var(--font-semibold); color: var(--text-muted); font-size: var(--font-ui-small); text-transform: uppercase; letter-spacing: .04em; }
 .mx-hk-row { display: grid; grid-template-columns: minmax(140px, 1fr) auto; align-items: center; gap: 2px 12px; padding: 5px 0; border-top: 1px solid var(--background-modifier-border); }
 .mx-hk-row.is-recording { background: var(--background-modifier-hover); }
 .mx-hk-label { font-size: var(--font-ui-small); }
 .mx-hk-keys { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+.mx-hk-keys kbd { white-space: nowrap; }
 .mx-hk-chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 2px 1px 6px; border-radius: var(--radius-s); background: var(--background-modifier-border); font-size: var(--font-ui-smaller); }
 .mx-hk-chip kbd { background: none; border: 0; padding: 0; white-space: nowrap; }
 .mx-hk-del { padding: 0 4px !important; height: auto !important; line-height: 1.2; }
@@ -14051,7 +14236,7 @@ body.anp-colorful-frame .workspace-tab-header-container > .sidebar-toggle-button
     <div class="status-bar-item" id="st-save" hidden></div>
     <div class="status-bar-item mod-clickable" id="st-changes" title="View changes">Changes</div>
     <div class="status-bar-item mod-clickable" id="st-mode" hidden></div>
-    <div class="status-bar-item mx-version" id="st-version" title="Maxidian version">v1.6.4+f1288e6</div>
+    <div class="status-bar-item mx-version" id="st-version" title="Maxidian version">v1.6.5+b535367</div>
   </div>
 </div>
 <div class="mx-start" id="start" hidden></div>
@@ -18796,6 +18981,8 @@ const ICONS = {
   'calendar': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
   'spell-check': '<path d="m6 16 6-12 6 12"/><path d="M8 12h8"/><path d="m16 20 2 2 4-4"/>',
   'chevron-right': '<path d="m9 18 6-6-6-6"/>',
+  'chevron-up': '<path d="m18 15-6-6-6 6"/>',
+  'chevron-down': '<path d="m6 9 6 6 6-6"/>',
   'panel-left': '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>',
   'panel-right': '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/>',
   'file-plus': '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/>',
@@ -19425,7 +19612,7 @@ const State = {
       hideFirst: 'right',   // which auto-hiding sidebar goes first on a narrow window ('right' | 'left')
       recentOpen: true, recentHeight: 0, recentEdited: false,   // px; 0 = automatic; edited = by file modification time
       style: { mode: '', overrides: {}, useVaultTheme: false, snippets: true, builtin: 'light-coffee', headingSizes: [] },
-      editor: { defaultView: '', live: true, spell: false, autosaveMs: 1000, codeCopyVisible: true, lineWidth: 0, propsCollapsed: false, clearSelectionOnLeave: false, saveOnLeave: true, checkedOpacity: 1, checkedStrike: true, minWidth: MIN_EDITOR_WIDTH },
+      editor: { defaultView: '', live: true, spell: false, autosaveMs: 1000, codeCopyVisible: true, lineWidth: 0, propsCollapsed: false, clearSelectionOnLeave: false, saveOnLeave: true, checkedOpacity: 1, checkedStrike: true, minWidth: MIN_EDITOR_WIDTH, findColor: '', findSmooth: true, findFuzzy: false },
       iconPath: '',
       filterVault: false,
       notes: { location: '', folder: '', attachmentFolder: '', dailyFolder: '' },
@@ -19464,6 +19651,11 @@ const State = {
     const data = { ...def, ...d, left: { ...def.left, ...d.left }, right: { ...def.right, ...d.right }, style: { ...def.style, ...d.style }, editor: { ...def.editor, ...d.editor }, notes: { ...def.notes, ...d.notes }, files: { ...def.files, ...d.files }, panes: { ...def.panes, ...d.panes }, history: { ...def.history, ...d.history }, search: { ...def.search, ...(d.search && typeof d.search === 'object' ? d.search : {}) } };
     data.editor.minWidth = editorMinWidth(data.editor.minWidth);
     if (typeof data.editor.saveOnLeave !== 'boolean') data.editor.saveOnLeave = true;
+    if (typeof data.editor.findSmooth !== 'boolean') data.editor.findSmooth = true;
+    if (typeof data.editor.findFuzzy !== 'boolean') data.editor.findFuzzy = false;
+    if (typeof data.editor.findColor !== 'string' || (data.editor.findColor && !/^#[0-9a-f]{6}$/i.test(data.editor.findColor))) data.editor.findColor = '';
+    data.editor.findColor = data.editor.findColor.toLowerCase();
+    if (data.editor.findColor === '#f5b800') data.editor.findColor = '';   // FIND_DEFAULT_COLOR is stored as ''
     if (data.hideFirst !== 'left') data.hideFirst = 'right';
     data.hotkeys = Hotkeys.clean(data.hotkeys);   // unknown actions and invalid bindings are dropped
     data.trash = Trash.clean(data.trash);
@@ -20022,18 +20214,18 @@ const Query = {
   // job: { alts, notes: [[path, text, tags]], matchCase, wholeWord, limit, deadline? } -> { hits: [{path, ranges, pathHit, capped}], timeout }
   // Offsets always index the ORIGINAL text, also when the accent fold changes its length (start/end maps).
   core: function (job) {
-    const nf = t => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase(), LIM = job.limit, word = /[\p{L}\p{N}_]/u;
-    // fold -> { s: folded text, start/end: original offset of each folded character (only when the length changed) }
+    const strip = t => t.normalize('NFD').replace(/\p{M}/gu, ''), nf = t => strip(t).toLowerCase(), LIM = job.limit, word = /[\p{L}\p{N}_]/u;
+    // fold -> { s: folded text, start/end: original offset of each folded character (omitted for plain ASCII) }
     const fold = job.matchCase ? s => ({ s }) : s => {
-      const n = nf(s);
-      if (n.length === s.length) return { s: n };
+      if (/^[\x00-\x7f]*$/.test(s)) return { s: s.toLowerCase() };
       const o = { s: '', start: [], end: [] }; let p = 0;
       for (const c of s) {
-        const f = nf(c);
+        const f = c < '\x80' ? c : strip(c);
         for (let k = 0; k < f.length; k++) { o.start.push(p); o.end.push(p + c.length); }
         if (!f && o.end.length) o.end[o.end.length - 1] = p + c.length;   // a stripped accent belongs to the letter before it
         o.s += f; p += c.length;
       }
+      o.s = o.s.toLowerCase();
       return o;
     };
     const edge = ch => ch !== undefined && word.test(ch);
@@ -20041,18 +20233,26 @@ const Query = {
     const find = (h, orig, needle) => {
       const out = [];
       if (!needle) return out;
-      for (let i = h.s.indexOf(needle); i >= 0 && out.length < LIM; i = h.s.indexOf(needle, i + needle.length)) {
+      for (let i = h.s.indexOf(needle); i >= 0 && out.length < LIM;) {
         const a = h.start ? h.start[i] : i, b = h.start ? h.end[i + needle.length - 1] : i + needle.length;
-        if (!job.wholeWord || bounded(orig, a, b)) out.push([a, b]);
+        const ok = !job.wholeWord || bounded(orig, a, b);
+        if (ok) out.push([a, b]);
+        i = h.s.indexOf(needle, i + (ok ? needle.length : 1));   // a rejected candidate may overlap a valid one
       }
       return out;
     };
     const rfind = (re, text) => {
       const out = [];
       re.lastIndex = 0;
+      const step = i => re.unicode && text.codePointAt(i) > 0xffff ? 2 : 1;
       for (let m; out.length < LIM && (m = re.exec(text));) {
-        if (!m[0]) { re.lastIndex++; continue; }
+        if (!m[0]) {
+          if (re.lastIndex >= text.length) break;
+          re.lastIndex += step(re.lastIndex);
+          continue;
+        }
         if (!job.wholeWord || bounded(text, m.index, m.index + m[0].length)) out.push([m.index, m.index + m[0].length]);
+        else re.lastIndex = m.index + step(m.index);   // a rejected candidate may overlap a valid one
       }
       return out;
     };
@@ -20878,11 +21078,12 @@ const Editor = {
       EditorView.lineWrapping,
       CM.closeBrackets(),
       EditorState.languageData.of(() => [{ closeBrackets: { brackets: ['(', '[', '{', '`'] } }]),
-      CM.search({ top: true }),
+      findExt,
       headingFolding,
       afterBlockExt, appKeys, wrapInput, refLinks, liveField, liveHandlers,
       keymap.of([...CM.closeBracketsKeymap, { key: 'Backspace', run: CM.deleteMarkupBackward }, { key: 'Enter', run: enterCmd },
-        ...CM.defaultKeymap, ...CM.searchKeymap, ...CM.historyKeymap, ...CM.foldKeymap]),
+        ...CM.defaultKeymap, ...CM.historyKeymap, ...CM.foldKeymap,
+        ...CM.searchKeymap.filter(b => b.key === 'Mod-d' || b.key === 'Mod-Alt-g')]),
       EditorView.updateListener.of(u => this.onUpdate(u)),
       Object.keys(this.conf).map(k => this.conf[k].of(c[k])),
     ];
@@ -20951,61 +21152,140 @@ const Editor = {
 };
 
 /* ===== src/js/62-listdrag.js ===== */
-// Drag a list item by its Live Preview checkbox or bullet. Keep the edit in one
-// CodeMirror transaction so the move can be undone as one action.
+// Drag a list item by its Live Preview checkbox or bullet. Vertical movement picks the place, horizontal movement the
+// nesting level. Keep the edit in one CodeMirror transaction so the move can be undone as one action.
 const ListDrag = {
-  item(doc, number, tabSize) {
+  STEP: 32,   // px sideways per nesting level; less than one step keeps the item's own level
+
+  // Markdown tab stops are 4 columns whatever the editor's tab size.
+  width(s) { let n = 0; for (const c of s) n += c === '\t' ? 4 - n % 4 : 1; return n; },
+  lead(text) { return /^[ \t]*/.exec(text)[0]; },
+
+  item(state, number) {
+    const doc = state.doc;
     if (number < 1 || number > doc.lines) return null;
-    const line = doc.line(number).text;
-    const match = /^([ \t]*)(?:[-*+]|\d+[.)])(?:[ \t]+|$)/.exec(line);
+    const line = doc.line(number), match = /^([ \t]*)((?:[-*+]|\d+[.)])(?:[ \t]+|$))/.exec(line.text);
     if (!match) return null;
-    const width = s => { let n = 0; for (const c of s) n += c === '\t' ? tabSize - n % tabSize : 1; return n; };
-    const indent = width(match[1]);
+    const raw = match[1], indent = this.width(raw);
+    for (let n = CM.syntaxTree(state).resolveInner(line.from + raw.length, 1); n; n = n.parent) if (/^(FencedCode|CodeBlock|Frontmatter)$/.test(n.name)) return null;
     let end = number;
     for (let i = number + 1; i <= doc.lines; i++) {
       const next = doc.line(i).text;
-      if (!next.trim()) {
-        let j = i + 1;
-        while (j <= doc.lines && !doc.line(j).text.trim()) j++;
-        if (j > doc.lines || width(doc.line(j).text.match(/^[ \t]*/)[0]) <= indent) break;
-        end = i;
-        continue;
-      }
-      if (width(next.match(/^[ \t]*/)[0]) <= indent) break;
+      if (!next.trim()) continue;
+      if (this.width(this.lead(next)) <= indent) break;
       end = i;
     }
-    return { start: number, end, indent };
+    return { start: number, end, indent, raw, marker: match[2].length };
   },
 
-  target(view, event, source) {
-    const rect = view.dom.getBoundingClientRect();
-    if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) return null;
-    const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-    if (pos == null) return null;
-    const doc = view.state.doc, tabSize = view.state.tabSize;
-    let number = doc.lineAt(pos).number;
-    let item = this.item(doc, number, tabSize);
-    if (!item) {
-      for (let i = number - 1; i >= 1; i--) {
-        const parent = this.item(doc, i, tabSize);
-        if (parent && parent.end >= number) { item = parent; break; }
-        if (doc.line(i).text && !parent) break;
+  // The items that contain a line, outermost first; lines of the dragged block are ignored.
+  chain(state, number, skip) {
+    const out = [];
+    for (let i = number; i >= 1; i--) {
+      if (skip && i >= skip.start && i <= skip.end) continue;
+      const text = state.doc.line(i).text;
+      if (!text.trim()) continue;
+      const indent = this.width(this.lead(text));
+      if (!out.length || indent < out[0].indent) {
+        const item = this.item(state, i);
+        if (item && item.end >= number) out.unshift(item);
       }
+      if (!indent) break;
     }
-    if (!item || item.indent !== source.indent) return null;
-    const first = doc.line(item.start);
-    const top = view.coordsAtPos(first.from), bottom = view.coordsAtPos(first.to);
-    const after = top && bottom ? event.clientY >= (top.top + bottom.bottom) / 2 : false;
-    const destination = after ? item.end + 1 : item.start;
-    if (destination >= source.start && destination <= source.end + 1) return null;
-    return { item, after, destination };
+    return out;
   },
 
-  move(view, source, destination) {
+  // First direct child of an item that is not the dragged block.
+  child(state, parent, skip) {
+    for (let i = parent.start + 1; i <= parent.end; i++) {
+      if (skip && i >= skip.start && i <= skip.end) continue;
+      const item = this.item(state, i);
+      if (item) return item;
+    }
+    return null;
+  },
+
+  // Indentation of a first child: the note's own style, else the editor's indent unit.
+  unit(state) {
+    for (let i = 1; i <= state.doc.lines; i++) {
+      if (!/^[ \t]+(?:[-*+]|\d+[.)])[ \t]/.test(state.doc.line(i).text)) continue;
+      const c = this.chain(state, i), item = c.at(-1), parent = c.at(-2);
+      if (parent && item.start === i && item.raw.startsWith(parent.raw)) return item.raw.slice(parent.raw.length);
+    }
+    return state.facet(CM.indentUnit);
+  },
+
+  childRaw(parent, unit) {
+    const raw = parent.raw + unit, rel = this.width(raw) - parent.indent, need = Math.min(parent.marker, 5);
+    // Less would not nest, four columns more would be a code block.
+    return rel < need || rel >= need + 4 ? ' '.repeat(parent.indent + need) : raw;
+  },
+
+  // Where the block lands: { destination (line number to insert before), raw (new indentation), after, ref, deeper } or null.
+  place(state, source, depth, number, lower, unit) {
+    const doc = state.doc, self = number >= source.start && number <= source.end;
+    const path = this.chain(state, self ? source.start : number);
+    if (!path.length) return null;
+    const top = path.length - 1;
+    let item = path[top], after = !self && lower(item);
+    if (top > depth) { item = path[depth]; after = true; }   // below that ancestor's whole subtree: nothing gets adopted
+    let destination = item.start;
+    if (after) destination = (top < depth && this.child(state, item, source)?.start) || item.end + 1;
+    if (self && top <= depth || destination >= source.start && destination <= source.end + 1) { destination = source.start; after = false; }
+    const ours = n => n >= source.start && n <= source.end;
+    let above = destination - 1, below = destination;
+    while (above >= 1 && (ours(above) || !doc.line(above).text.trim())) above--;
+    while (below <= doc.lines && (ours(below) || !doc.line(below).text.trim())) below++;
+    const parents = above ? this.chain(state, above, source) : [], next = this.item(state, below);
+    const levels = [{ raw: parents[0]?.raw ?? next?.raw ?? '', ref: parents[0] || next }];
+    for (const p of parents) {
+      const c = this.child(state, p, source);
+      levels.push(c ? { raw: c.raw, ref: c } : { raw: this.childRaw(p, unit), ref: p, deeper: true });
+    }
+    // A level shallower than the next item would turn that item into a child of the dropped one.
+    let best = null;
+    levels.forEach((l, i) => {
+      if (next && this.width(l.raw) < next.indent) return;
+      if (!best || Math.abs(i - depth) < Math.abs(best.i - depth)) best = { ...l, i };
+    });
+    // A nested block joins the item above directly: after a blank line deep tab indentation may parse as code.
+    if (best?.i && destination !== source.start && above + 1 < destination && !ours(above + 1)) { destination = above + 1; after = true; }
+    if (!best || destination === source.start && best.raw === source.raw) return null;
+    return { destination, after, raw: best.raw, ref: best.ref, deeper: !!best.deeper };
+  },
+
+  target(view, event, source, g) {
+    const rect = view.dom.closest('.view-content').getBoundingClientRect();   // the pane: the editor itself ends at the text column
+    if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) return null;
+    // Sideways movement may leave the text column: only the row counts here.
+    const box = view.contentDOM.getBoundingClientRect(), y = event.clientY - view.documentTop;
+    if (y < 0 || y > view.contentHeight) return null;
+    const pos = view.posAtCoords({ x: Math.max(box.left + 2, Math.min(event.clientX, box.right - 2)), y: event.clientY }, false);
+    const doc = view.state.doc, lower = item => {
+      const first = doc.line(item.start), top = view.coordsAtPos(first.from), bottom = view.coordsAtPos(first.to);
+      return top && bottom ? event.clientY >= (top.top + bottom.bottom) / 2 : true;
+    };
+    const depth = Math.max(0, g.depth + Math.trunc((event.clientX - g.x) / this.STEP));
+    return this.place(view.state, source, depth, doc.lineAt(pos).number, lower, g.unit);
+  },
+
+  // The block's lines with the first line's indentation replaced and the others moved along.
+  reindent(lines, source, raw) {
+    if (raw === source.raw) return lines;
+    return lines.map(text => {
+      const lead = this.lead(text);
+      if (lead.length === text.length) return text;
+      const rest = lead.startsWith(source.raw) ? lead.slice(source.raw.length) : null, body = text.slice(lead.length);
+      if (rest !== null && (/^\t*$/.test(raw) || !rest.includes('\t'))) return raw + rest + body;
+      return ' '.repeat(Math.max(0, this.width(lead) + this.width(raw) - source.indent)) + body;
+    });
+  },
+
+  move(view, source, drop) {
     const before = view.state.doc.toString(), lines = before.split('\n');
     const count = source.end - source.start + 1;
-    const moved = lines.splice(source.start - 1, count);
-    const index = destination - 1 - (destination > source.end ? count : 0);
+    const old = lines.splice(source.start - 1, count), moved = this.reindent(old, source, drop.raw);
+    const index = drop.destination - 1 - (drop.destination > source.end ? count : 0);
     lines.splice(index, 0, ...moved);
     const after = lines.join('\n');
     if (after === before) return;
@@ -21017,35 +21297,49 @@ const ListDrag = {
     const s0 = source.start - 1, oldDoc = view.state.doc;
     const follow = pos => {
       const line = oldDoc.lineAt(pos), l0 = line.number - 1;
-      let n0;
-      if (l0 >= s0 && l0 < s0 + count) n0 = index + l0 - s0;
+      let n0, col = pos - line.from;
+      if (l0 >= s0 && l0 < s0 + count) { n0 = index + l0 - s0; col = Math.max(0, col + moved[l0 - s0].length - old[l0 - s0].length); }
       else { const r0 = l0 < s0 ? l0 : l0 - count; n0 = r0 < index ? r0 : r0 + count; }
-      return lines.slice(0, n0).reduce((n, l) => n + l.length + 1, 0) + pos - line.from;
+      return lines.slice(0, n0).reduce((n, l) => n + l.length + 1, 0) + col;
     };
     const sel = view.state.selection.main;
     view.dispatch({ changes: { from, to: before.length - tail, insert: after.slice(from, after.length - tail) },
       selection: { anchor: follow(sel.anchor), head: follow(sel.head) }, userEvent: 'input.move', annotations: CM.isolateHistory.of('full') });
   },
 
+  // Drop line: a fixed overlay (no layout change) that starts at the level the block would get.
+  indicate(view, drop, el) {
+    const doc = view.state.doc, edge = view.scrollDOM.getBoundingClientRect(), box = view.contentDOM.getBoundingClientRect();
+    const block = view.lineBlockAt(doc.line(drop.after ? drop.destination - 1 : drop.destination).from);
+    const y = view.documentTop + (drop.after ? block.bottom : block.top);
+    const ref = drop.ref && view.coordsAtPos(doc.line(drop.ref.start).from + drop.ref.raw.length);
+    const x = Math.max(box.left, Math.min((ref ? ref.left : box.left) + (drop.deeper ? 24 : 0), box.right - 24));
+    el.className = 'mx-list-drop ' + (drop.after ? 'mx-drop-after' : 'mx-drop-before');
+    el.hidden = y < edge.top - 2 || y > edge.bottom + 2;
+    Object.assign(el.style, { left: x + 'px', top: y - 1 + 'px', width: box.right - x + 'px' });
+  },
+
   start(view, marker, event, checkbox = false) {
     if (event.button !== 0 || view.state.readOnly) return;
-    const doc = view.state.doc, source = this.item(doc, doc.lineAt(marker).number, view.state.tabSize);
+    const doc = view.state.doc, source = this.item(view.state, doc.lineAt(marker).number);
     if (!source) return;
     event.preventDefault(); event.stopPropagation();
     const x = event.clientX, y = event.clientY;
-    let dragging = false, drop = null, indicated = null;
-    const clear = () => { indicated?.classList.remove('mx-drop-before', 'mx-drop-after'); indicated = null; };
+    const g = { x, depth: this.chain(view.state, source.start).length - 1, unit: this.unit(view.state) };
+    let dragging = false, drop = null, indicated = null, last = null;
+    const clear = () => { indicated?.remove(); indicated = null; };
     const show = next => {
-      clear(); drop = next;
-      if (!next) return;
-      const node = view.domAtPos(doc.line(next.after ? next.item.end : next.item.start).from).node;
-      indicated = (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement).closest?.('.cm-line');
-      indicated?.classList.add(next.after ? 'mx-drop-after' : 'mx-drop-before');
+      drop = next;
+      if (!next) return clear();
+      if (!indicated) document.body.append(indicated = h('div'));
+      this.indicate(view, next, indicated);
     };
+    const scrolled = () => { if (dragging && last) move(last); };
     const move = e => {
+      last = e;
       if (!dragging && Math.hypot(e.clientX - x, e.clientY - y) < 5) return;
       if (!dragging) { dragging = true; document.body.classList.add('mx-list-dragging'); }
-      show(view.state.doc === doc ? this.target(view, e, source) : null);
+      show(view.state.doc === doc ? this.target(view, e, source, g) : null);
     };
     // The gesture is mouse based: a native drag (Chromium starts one when the press lands on a selection) would starve it of
     // mousemove/mouseup and could MOVE text out of the note, so it is cancelled. Escape abandons the gesture.
@@ -21053,6 +21347,7 @@ const ListDrag = {
     const stop = () => {
       removeEventListener('mousemove', move, true);
       removeEventListener('mouseup', up, true);
+      removeEventListener('scroll', scrolled, true);
       removeEventListener('dragstart', noNative, true);
       removeEventListener('keydown', key, true);
       document.body.classList.remove('mx-list-dragging');
@@ -21062,7 +21357,7 @@ const ListDrag = {
     const up = () => {
       stop();
       if (view.state.doc !== doc || !view.dom.isConnected) return;
-      if (dragging) { if (drop) this.move(view, source, drop.destination); return; }
+      if (dragging) { if (drop) this.move(view, source, drop); return; }
       if (checkbox && view.state.sliceDoc(marker, marker + 1) === '[') {
         const value = view.state.sliceDoc(marker + 1, marker + 2);
         view.dispatch({ changes: { from: marker + 1, to: marker + 2, insert: value === ' ' ? 'x' : ' ' }, userEvent: 'input.toggle' });
@@ -21070,10 +21365,808 @@ const ListDrag = {
     };
     addEventListener('mousemove', move, true);
     addEventListener('mouseup', up, true);
+    addEventListener('scroll', scrolled, true);
     addEventListener('dragstart', noNative, true);
     addEventListener('keydown', key, true);
   },
 };
+
+/* ===== src/js/64-find.js ===== */
+/* ---------- on-page Find & Replace (floating overlay card for CodeMirror 6) ----------
+   Floats in a zero-height sticky anchor inside view.dom so opening, expanding Replace or
+   closing never shifts document text. Keeps Live Preview rendered while stepping matches
+   (only revealing block widgets or hidden link targets when the active match sits inside
+   them). Fuzzy mode reuses normalizeTerm + the word tokenizer semantics of 50-search.js. */
+
+const FIND_COLORS = [
+  ['', 'Amber (default)', '#f5b800'],
+  ['#f97316', 'Orange', '#f97316'],
+  ['#22c55e', 'Green', '#22c55e'],
+  ['#06b6d4', 'Cyan', '#06b6d4'],
+  ['#ec4899', 'Pink', '#ec4899'],
+  ['#a855f7', 'Purple', '#a855f7'],
+];
+const FIND_DEFAULT_COLOR = '#f5b800';
+const FIND_MAX_MATCHES = 5000;
+const FIND_WORD = /[\p{L}\p{N}_]/u;
+const FIND_TOKEN_RE = /[^\s\p{P}\p{S}]+/gu;
+
+function findBounded(text, a, b) {
+  const before = a > 0 ? [...text.slice(Math.max(0, a - 2), a)].pop() : '';
+  const after = b < text.length ? [...text.slice(b, b + 2)][0] : '';
+  return (!before || !FIND_WORD.test(before)) && (!after || !FIND_WORD.test(after));
+}
+
+// Optimal string alignment (Damerau-Levenshtein) with early cutoff at `max`.
+function findEditDist(a, b, max) {
+  const la = a.length, lb = b.length;
+  if (Math.abs(la - lb) > max) return max + 1;
+  if (!la) return lb;
+  if (!lb) return la;
+  let prev2 = new Int16Array(lb + 1), prev = new Int16Array(lb + 1), cur = new Int16Array(lb + 1);
+  for (let j = 0; j <= lb; j++) prev[j] = j;
+  for (let i = 1; i <= la; i++) {
+    cur[0] = i;
+    let rowMin = i;
+    const ca = a.charCodeAt(i - 1);
+    for (let j = 1; j <= lb; j++) {
+      const cost = ca === b.charCodeAt(j - 1) ? 0 : 1;
+      let v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      if (i > 1 && j > 1 && ca === b.charCodeAt(j - 2) && a.charCodeAt(i - 2) === b.charCodeAt(j - 1)) {
+        v = Math.min(v, prev2[j - 2] + 1);
+      }
+      cur[j] = v;
+      if (v < rowMin) rowMin = v;
+    }
+    if (rowMin > max) return max + 1;
+    const tmp = prev2; prev2 = prev; prev = cur; cur = tmp;
+  }
+  return prev[lb];
+}
+
+// Mirrors MiniSearch's fuzzy + prefix rules from 50-search.js (fuzzy: len > 3 ? 0.2 : 0, prefix: true).
+function findFuzzyTokenOk(word, q, wholeWord) {
+  if (word === q) return true;
+  if (!wholeWord && word.startsWith(q)) return true;
+  const max = q.length > 3 ? Math.max(1, Math.round(q.length * 0.2)) : 0;
+  return max > 0 && findEditDist(word, q, max) <= max;
+}
+
+function findFold(text) {
+  if (/^[\x00-\x7f]*$/.test(text)) return { s: text.toLowerCase() };
+  const o = { s: '', start: [], end: [] };
+  let p = 0;
+  for (const c of text) {
+    const f = normalizeTerm(c);
+    for (let k = 0; k < f.length; k++) { o.start.push(p); o.end.push(p + c.length); }
+    if (!f && o.end.length) o.end[o.end.length - 1] = p + c.length;
+    o.s += f; p += c.length;
+  }
+  return o;
+}
+
+// Step past one code unit, or one surrogate pair for /u regexes so lastIndex never lands mid-surrogate.
+const findRegexStep = (text, re, pos) => (re.unicode && text.codePointAt(pos) > 0xffff ? 2 : 1);
+
+// Run a global regex over `text` with zero-length astral safety and whole-word overlap retry. Returns true if capped.
+function findRegexExec(text, re, wholeWord, limit, onMatch) {
+  re.lastIndex = 0;
+  let count = 0;
+  for (let m; (m = re.exec(text));) {
+    if (!m[0]) {
+      if (re.lastIndex >= text.length) break;
+      re.lastIndex += findRegexStep(text, re, re.lastIndex);
+      continue;
+    }
+    const a = m.index, b = a + m[0].length;
+    if (!wholeWord || findBounded(text, a, b)) {
+      if (count >= limit) return true;
+      count++;
+      onMatch(m, a, b);
+    } else re.lastIndex = a + findRegexStep(text, re, a);   // retry one code point later for overlapping candidates
+  }
+  return false;
+}
+
+// Expand JS regex replacement patterns ($$, $&, $`, $', $n/$nn, $<name>) against the real full-doc match.
+function findExpandReplace(template, m, text) {
+  const groups = m.groups, maxGroup = m.length - 1;
+  return template.replace(/\$(?:\$|&|`|'|(\d\d?)|<([^>]*)>)/g, (tok, num, name) => {
+    if (tok === '$$') return '$';
+    if (tok === '$&') return m[0];
+    if (tok === '$`') return text.slice(0, m.index);
+    if (tok === "$'") return text.slice(m.index + m[0].length);
+    if (name !== undefined) return groups ? (groups[name] ?? '') : tok;
+    if (num !== undefined) {
+      const n = Number(num);
+      if (n >= 1 && n <= maxGroup) return m[n] ?? '';
+      const d1 = num.length === 2 ? Number(num[0]) : 0;
+      if (d1 >= 1 && d1 <= maxGroup) return (m[d1] ?? '') + num[1];
+    }
+    return tok;
+  });
+}
+
+function computeFindMatches(text, opts) {
+  const q = opts.query || '';
+  if (!q) return { matches: [], capped: false, error: '' };
+  const matches = [];
+  const limit = opts.limit ?? FIND_MAX_MATCHES;
+  let capped = false;
+
+  if (opts.fuzzy) {
+    const norm = opts.caseSensitive ? s => s : normalizeTerm;
+    const qTokens = [...q.matchAll(FIND_TOKEN_RE)].map(m => norm(m[0])).filter(Boolean);
+    if (!qTokens.length) return { matches: [], capped: false, error: '' };
+    const tokens = [];
+    for (const m of text.matchAll(FIND_TOKEN_RE)) {
+      tokens.push({ from: m.index, to: m.index + m[0].length, val: norm(m[0]) });
+    }
+    if (qTokens.length === 1) {
+      const qt = qTokens[0];
+      for (const tok of tokens) {
+        if (findFuzzyTokenOk(tok.val, qt, opts.wholeWord)) {
+          if (matches.length >= limit) { capped = true; break; }
+          matches.push({ from: tok.from, to: tok.to });
+        }
+      }
+    } else {
+      // Consecutive fuzzy phrase spans first (not crossing blank lines); fall back to single-token OR matches.
+      for (let i = 0; i <= tokens.length - qTokens.length; i++) {
+        let ok = true;
+        for (let k = 0; k < qTokens.length; k++) {
+          if (k > 0 && /\n\s*\n/.test(text.slice(tokens[i + k - 1].to, tokens[i + k].from))) { ok = false; break; }
+          if (!findFuzzyTokenOk(tokens[i + k].val, qTokens[k], opts.wholeWord)) { ok = false; break; }
+        }
+        if (ok) {
+          if (matches.length >= limit) { capped = true; break; }
+          matches.push({ from: tokens[i].from, to: tokens[i + qTokens.length - 1].to });
+          i += qTokens.length - 1; // continue after the span: matches never overlap (Replace All needs disjoint ranges)
+        }
+      }
+      if (!matches.length) {
+        for (const tok of tokens) {
+          if (qTokens.some(qt => findFuzzyTokenOk(tok.val, qt, opts.wholeWord))) {
+            if (matches.length >= limit) { capped = true; break; }
+            matches.push({ from: tok.from, to: tok.to });
+          }
+        }
+      }
+    }
+    return { matches, capped, error: '' };
+  }
+
+  if (opts.regexp) {
+    let re;
+    try { re = mkRegex(q, opts.caseSensitive); }
+    catch (e) { return { matches: [], capped: false, error: Query.regexMessage(e) }; }
+    capped = findRegexExec(text, re, opts.wholeWord, limit, (_, from, to) => {
+      matches.push({ from, to });
+    });
+    return { matches, capped, error: '' };
+  }
+
+  const hay = opts.caseSensitive ? { s: text } : findFold(text);
+  const needle = opts.caseSensitive ? q : normalizeTerm(q);
+  if (!needle) return { matches: [], capped: false, error: '' };
+  for (let i = hay.s.indexOf(needle); i >= 0;) {
+    const a = hay.start ? hay.start[i] : i;
+    const b = hay.start ? hay.end[i + needle.length - 1] : i + needle.length;
+    const ok = !opts.wholeWord || findBounded(text, a, b);
+    if (ok) {
+      if (matches.length >= limit) { capped = true; break; }
+      matches.push({ from: a, to: b });
+    }
+    // A rejected whole-word candidate may overlap a valid one ("a a" in "xa a a"): retry one step later.
+    i = hay.s.indexOf(needle, i + (ok ? needle.length : 1));
+  }
+  return { matches, capped, error: '' };
+}
+
+function findPickIndex(matches, anchorPos) {
+  if (!matches.length) return -1;
+  const i = matches.findIndex(m => m.from >= anchorPos);
+  return i >= 0 ? i : 0;
+}
+
+const findEffect = CM.StateEffect.define();
+
+function emptyFindState() {
+  return {
+    open: false, replaceOpen: false, query: '', replace: '',
+    caseSensitive: false, wholeWord: false, regexp: false,
+    fuzzy: !!State.data?.editor?.findFuzzy,
+    matches: [], capped: false, index: -1, step: 0, anchor: 0, error: '',
+  };
+}
+
+function buildFindDecos(fs) {
+  if (!fs.open || !fs.matches.length) return Decoration.none;
+  const out = [];
+  for (let i = 0; i < fs.matches.length; i++) {
+    const m = fs.matches[i];
+    if (m.to <= m.from) continue;
+    const cls = i === fs.index
+      ? 'cm-searchMatch cm-searchMatch-selected ' + (fs.step % 2 ? 'mx-find-pulse-b' : 'mx-find-pulse-a')
+      : 'cm-searchMatch';
+    out.push(Decoration.mark({ class: cls }).range(m.from, m.to));
+  }
+  return Decoration.set(out, true);
+}
+
+const findField = StateField.define({
+  create: () => {
+    const state = emptyFindState();
+    return { ...state, decos: Decoration.none };
+  },
+  update(val, tr) {
+    let next = val, recompute = false, changed = false;
+    if (next.open && tr.docChanged) next = { ...next, anchor: tr.changes.mapPos(next.anchor) };
+    if (next.open && tr.selection && !tr.isUserEvent('input.replace')) next = { ...next, anchor: tr.state.selection.main.from };
+    for (const e of tr.effects) {
+      if (!e.is(findEffect)) continue;
+      changed = true;
+      const { anchor: pAnchor, recompute: pRecompute, ...p } = e.value;
+      const wasOpen = next.open;
+      const qChanged = ('query' in p && p.query !== next.query)
+        || ('caseSensitive' in p && p.caseSensitive !== next.caseSensitive)
+        || ('wholeWord' in p && p.wholeWord !== next.wholeWord)
+        || ('regexp' in p && p.regexp !== next.regexp)
+        || ('fuzzy' in p && p.fuzzy !== next.fuzzy);
+      next = { ...next, ...p };
+      if (!next.open) {
+        return { ...next, matches: [], capped: false, index: -1, error: '', decos: Decoration.none };
+      }
+      if (pAnchor !== undefined && (!wasOpen || qChanged || pRecompute || 'index' in p)) next = { ...next, anchor: pAnchor };
+      if (!wasOpen || qChanged || pRecompute) recompute = true;
+    }
+    if (next.open && tr.docChanged) recompute = true;
+    if (recompute && next.open) {
+      const res = computeFindMatches(tr.state.doc.toString(), next);
+      const index = findPickIndex(res.matches, next.anchor);
+      next = { ...next, matches: res.matches, capped: res.capped, error: res.error, index };
+      return { ...next, decos: buildFindDecos(next) };
+    }
+    if (changed) return { ...next, decos: buildFindDecos(next) };
+    return next.anchor === val.anchor ? val : next;
+  },
+  provide: f => EditorView.decorations.from(f, v => v.decos),
+});
+
+function findActiveMatch(state) {
+  const fs = state.field(findField, false);
+  return fs && fs.open && fs.index >= 0 ? fs.matches[fs.index] || null : null;
+}
+
+// Unfold any collapsed ranges strictly overlapping `match` (touching endpoints stay folded).
+function unfoldMatch(view, match) {
+  if (!view || !match) return;
+  const effects = [];
+  CM.foldedRanges(view.state).between(match.from, match.to, (from, to) => {
+    if (from < match.to && to > match.from) effects.push(CM.unfoldEffect.of({ from, to }));
+  });
+  if (effects.length) view.dispatch({ effects });
+}
+
+const Find = {
+  panels: new WeakMap(),     // EditorView -> FindPanel instance
+  scrollRafs: new WeakMap(), // EditorView -> pending scroll rAF id
+
+  isOpen(view) { return !!(view && view.state.field(findField, false)?.open); },
+
+  smooth() { return State.data?.editor?.findSmooth !== false; },
+
+  color() { return State.data?.editor?.findColor || FIND_DEFAULT_COLOR; },
+
+  // Open (or refocus) the floating Find panel on `view`.
+  open(view, opts = {}) {
+    if (!view) return false;
+    const fs = view.state.field(findField, false);
+    if (!fs) return false;
+    const sel = view.state.selection.main;
+    let query = fs.query;
+    if (!sel.empty && sel.to - sel.from <= 200) {
+      const picked = view.state.sliceDoc(sel.from, sel.to);
+      if (!picked.includes('\n')) query = picked;
+    }
+    const replaceOpen = opts.replace ? !view.state.readOnly : (fs.open ? fs.replaceOpen : false);
+    const fuzzy = fs.open ? fs.fuzzy : !!State.data?.editor?.findFuzzy;
+    const regexp = fuzzy ? false : fs.regexp;
+    view.dispatch({ effects: findEffect.of({ open: true, replaceOpen, query, fuzzy, regexp, anchor: sel.from }) });
+    const panel = this.panels.get(view);
+    if (panel) panel.userMoved = false;
+    panel?.focus(opts.replace ? 'replace' : 'search');
+    const cur = findActiveMatch(view.state);
+    if (cur) { unfoldMatch(view, cur); this.scrollTo(view, cur, { onlyIfOffscreen: true }); }
+    return true;
+  },
+
+  cancelScroll(view) {
+    const tok = this.scrollRafs.get(view);
+    if (tok) { cancelAnimationFrame(tok.id); this.scrollRafs.delete(view); }
+  },
+
+  // Close the floating Find panel; returns focus to the editor and moves the caret to the active match,
+  // unless the user placed the caret themselves (click, arrows, typing) since the last open/step.
+  close(view, opts = {}) {
+    if (!view || !this.isOpen(view)) return false;
+    this.cancelScroll(view);
+    const active = findActiveMatch(view.state);
+    const spec = { effects: [findEffect.of({ open: false })] };
+    if (active && opts.moveCaret !== false && !this.panels.get(view)?.userMoved) spec.selection = { anchor: active.from };
+    view.dispatch(spec);
+    if (opts.focusEditor !== false) view.focus();
+    return true;
+  },
+
+  step(view, dir = 1) {
+    if (!view) return false;
+    const fs = view.state.field(findField, false);
+    if (!fs || !fs.open || !fs.matches.length) return false;
+    const n = fs.matches.length;
+    const index = fs.index < 0 ? (dir > 0 ? 0 : n - 1) : (fs.index + dir + n) % n;
+    const target = fs.matches[index];
+    view.dispatch({ effects: findEffect.of({ index, step: fs.step + 1, anchor: target.from }) });
+    unfoldMatch(view, target);
+    const panel = this.panels.get(view);
+    if (panel) panel.userMoved = false;
+    this.scrollTo(view, target);
+    return true;
+  },
+
+  replaceCurrent(view) {
+    if (!view || view.state.readOnly) return false;
+    const fs = view.state.field(findField, false);
+    if (!fs || !fs.open || fs.index < 0 || !fs.matches[fs.index]) return false;
+    const m = fs.matches[fs.index];
+    const insert = fs.regexp && !fs.fuzzy ? this.replacementText(view.state.doc.toString(), m, fs) : fs.replace;
+    view.dispatch({
+      changes: { from: m.from, to: m.to, insert },
+      effects: findEffect.of({ anchor: m.from + insert.length, step: fs.step + 1, recompute: true }),
+      userEvent: 'input.replace',
+    });
+    const next = findActiveMatch(view.state);
+    if (next) { unfoldMatch(view, next); this.scrollTo(view, next, { onlyIfOffscreen: true }); }
+    return true;
+  },
+
+  replaceAll(view) {
+    if (!view || view.state.readOnly) return false;
+    const fs = view.state.field(findField, false);
+    if (!fs || !fs.open || !fs.matches.length) return false;
+    const doc = view.state.doc;
+    let changes;
+    if (fs.regexp && !fs.fuzzy) {
+      let re;
+      try { re = mkRegex(fs.query, fs.caseSensitive); } catch { return false; }
+      const text = doc.toString();
+      changes = [];
+      findRegexExec(text, re, fs.wholeWord, Infinity, (m, from, to) => {
+        changes.push({ from, to, insert: findExpandReplace(fs.replace, m, text) });
+      });
+    } else {
+      // The counter caps at FIND_MAX_MATCHES; Replace All still replaces every match.
+      const all = fs.capped ? computeFindMatches(doc.toString(), { ...fs, limit: Infinity }).matches : fs.matches;
+      changes = all.map(m => ({ from: m.from, to: m.to, insert: fs.replace }));
+    }
+    if (!changes.length) return false;
+    view.dispatch({ changes, effects: findEffect.of({ anchor: 0, recompute: true }), userEvent: 'input.replace.all' });
+    return true;
+  },
+
+  replacementText(text, match, fs, re) {
+    if (!fs.regexp || fs.fuzzy) return fs.replace;
+    try {
+      const rx = re || mkRegex(fs.query, fs.caseSensitive);
+      rx.lastIndex = match.from;
+      const m = rx.exec(text);
+      return m && m.index === match.from && m.index + m[0].length === match.to ? findExpandReplace(fs.replace, m, text) : fs.replace;
+    } catch { return fs.replace; }
+  },
+
+  // Scroll `.markdown-source-view` smoothly (or instantly when disabled / reduced motion) to frame `match`
+  // with clearance below the floating Find card.
+  scrollTo(view, match, opts = {}) {
+    if (!view || !match) return;
+    const scroller = view.dom.closest('.markdown-source-view');
+    if (!scroller) return;
+    this.cancelScroll(view);
+    const doc = view.state.doc;
+    const useSmooth = this.smooth() && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const token = { id: 0 };
+    const run = () => {
+      if (this.scrollRafs.get(view) === token) this.scrollRafs.delete(view);
+      if (!view.dom.isConnected || view.state.doc !== doc || match.from > doc.length) return;
+      const cur = findActiveMatch(view.state);
+      if (!cur || cur.from !== match.from || cur.to !== match.to) return;
+      const scrollerRect = scroller.getBoundingClientRect();
+      let coords = null;
+      try { coords = view.coordsAtPos(match.from); } catch {}
+      let matchTop, matchBottom;
+      if (coords && coords.bottom > coords.top) {
+        matchTop = scroller.scrollTop + (coords.top - scrollerRect.top);
+        matchBottom = scroller.scrollTop + (coords.bottom - scrollerRect.top);
+      } else {
+        let block;
+        try { block = view.lineBlockAt(match.from); } catch { return; }
+        const contentTop = scroller.scrollTop + (view.contentDOM.getBoundingClientRect().top - scrollerRect.top);
+        matchTop = contentTop + block.top;
+        matchBottom = matchTop + block.height;
+      }
+      const panelEl = view.dom.querySelector('.cm-search.mx-find');
+      const topClearance = (panelEl ? panelEl.offsetHeight : 64) + 28;
+      const inView = top => matchTop >= top + topClearance && matchBottom <= top + scroller.clientHeight - 40;
+      const settled = scroller.mxFindTarget;
+      // Skip only when the match is visible both now and at any in-flight smooth-scroll destination
+      // (a cancelled scroll can leave mxFindTarget stale; an active scroll can carry a passing match off screen).
+      if (opts.onlyIfOffscreen && inView(scroller.scrollTop) && (settled === undefined || inView(settled))) return;
+      const maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      const target = Math.min(maxTop, Math.max(0, matchTop - Math.max(topClearance, scroller.clientHeight * 0.36)));
+      const smooth = useSmooth && Math.abs(target - scroller.scrollTop) >= 1;
+      clearTimeout(scroller.mxFindTimer);
+      scroller.mxFindTarget = smooth ? target : undefined;
+      if (smooth) {
+        if (!scroller.mxFindEnd) {
+          scroller.mxFindEnd = () => { clearTimeout(scroller.mxFindTimer); scroller.mxFindTarget = undefined; };
+          scroller.addEventListener('scrollend', scroller.mxFindEnd);
+        }
+        scroller.mxFindTimer = setTimeout(scroller.mxFindEnd, 1200);
+      }
+      scroller.scrollTo({ top: target, behavior: smooth ? 'smooth' : 'auto' });
+    };
+    // Defer two frames so Blink flushes <input> selectionchange/RevealSelection on the sticky Find card
+    // before starting a smooth scroll on the ancestor scroller (otherwise Blink aborts the scroll on frame 1).
+    token.id = requestAnimationFrame(() => {
+      if (this.scrollRafs.get(view) !== token) return;
+      token.id = requestAnimationFrame(run);
+    });
+    this.scrollRafs.set(view, token);
+  },
+
+  setColor(hex) {
+    let clean = hex && /^#[0-9a-f]{6}$/i.test(hex) ? hex.toLowerCase() : '';
+    if (clean === FIND_DEFAULT_COLOR) clean = '';   // the default swatch is stored as ''
+    if (State.data?.editor) { State.data.editor.findColor = clean; State.save(); }
+    App.applyFindSetting();
+  },
+
+  setSmooth(on) {
+    if (State.data?.editor) { State.data.editor.findSmooth = !!on; State.save(); }
+    this.syncPrefs();
+  },
+
+  syncPrefs() {
+    for (const view of [Editor.view, Split.view]) this.panels.get(view)?.syncPrefs();
+  },
+};
+
+class FindPanel {
+  constructor(view) {
+    this.view = view;
+    this.anchor = this.card = this.closeTimer = this.closeEnd = this.openRaf = null;
+    this.paletteOpen = this.userMoved = false;   // userMoved: caret placed by user since last open/step/query
+    Find.panels.set(view, this);
+    this.sync(true);
+  }
+
+  build() {
+    const v = this.view;
+    const dispatch = patch => v.dispatch({ effects: findEffect.of(patch) });
+    const applyQuery = patch => {
+      this.userMoved = false;
+      dispatch(patch);
+      const cur = findActiveMatch(v.state);
+      if (cur) { unfoldMatch(v, cur); Find.scrollTo(v, cur, { onlyIfOffscreen: true }); }
+    };
+    this.toggleReplaceBtn = h('button', {
+      type: 'button', class: 'mx-find-btn mx-find-chevron', title: 'Toggle replace (Ctrl+H)',
+      'aria-label': 'Toggle replace', 'aria-expanded': 'false', html: icon('chevron-right'),
+      onclick: () => {
+        const open = !v.state.field(findField).replaceOpen;
+        dispatch({ replaceOpen: open });
+        if (open) this.replaceInput.focus();
+      },
+    });
+    this.searchInput = h('input', {
+      type: 'text', name: 'search', class: 'mx-find-input', placeholder: 'Find in note…',
+      'aria-label': 'Find', autocomplete: 'off', spellcheck: 'false',
+      oninput: () => applyQuery({ query: this.searchInput.value }),
+    });
+    this.countEl = h('span', { class: 'mx-find-count', 'aria-live': 'polite' });
+    this.prevBtn = h('button', {
+      type: 'button', name: 'prev', class: 'mx-find-btn', title: 'Previous match (Shift+Enter)',
+      'aria-label': 'Previous match', html: icon('chevron-up'), onclick: () => Find.step(v, -1),
+    });
+    this.nextBtn = h('button', {
+      type: 'button', name: 'next', class: 'mx-find-btn', title: 'Next match (Enter)',
+      'aria-label': 'Next match', html: icon('chevron-down'), onclick: () => Find.step(v, 1),
+    });
+    this.closeBtn = h('button', {
+      type: 'button', name: 'close', class: 'mx-find-btn mx-find-close', title: 'Close (Esc)',
+      'aria-label': 'Close', html: icon('x'), onclick: () => Find.close(v),
+    });
+
+    const mkToggle = (name, label, title, onClick) => h('button', {
+      type: 'button', name, class: 'mx-find-opt', title, 'aria-pressed': 'false', onclick: onClick,
+    }, label);
+    this.caseBtn = mkToggle('case', 'Aa', 'Match case', () => applyQuery({ caseSensitive: !v.state.field(findField).caseSensitive }));
+    this.wordBtn = mkToggle('word', 'ab', 'Whole word', () => applyQuery({ wholeWord: !v.state.field(findField).wholeWord }));
+    this.reBtn = mkToggle('re', '.*', 'Regular expression', () => {
+      const next = !v.state.field(findField).regexp;
+      if (next && v.state.field(findField).fuzzy && State.data?.editor) { State.data.editor.findFuzzy = false; State.save(); }
+      applyQuery({ regexp: next, ...(next ? { fuzzy: false } : {}) });
+    });
+
+    this.fuzzyChk = h('input', {
+      type: 'checkbox', name: 'fuzzy',
+      onchange: () => {
+        const next = this.fuzzyChk.checked;
+        if (State.data?.editor) { State.data.editor.findFuzzy = next; State.save(); }
+        applyQuery({ fuzzy: next, ...(next ? { regexp: false } : {}) });
+      },
+    });
+    this.smoothChk = h('input', {
+      type: 'checkbox', name: 'smooth', checked: Find.smooth(),
+      onchange: () => Find.setSmooth(this.smoothChk.checked),
+    });
+
+    this.colorDot = h('span', { class: 'mx-find-color-dot' });
+    this.colorBtn = h('button', {
+      type: 'button', name: 'color', class: 'mx-find-btn mx-find-color-btn',
+      title: 'Highlight color', 'aria-label': 'Highlight color', 'aria-expanded': 'false',
+      onclick: () => {
+        this.paletteOpen = !this.paletteOpen;
+        this.paletteRow.hidden = !this.paletteOpen;
+        this.colorBtn.setAttribute('aria-expanded', String(this.paletteOpen));
+      },
+    }, this.colorDot);
+
+    this.customColor = h('input', {
+      type: 'color', class: 'mx-find-color-custom', 'aria-label': 'Custom highlight color',
+      value: Find.color(), oninput: () => Find.setColor(this.customColor.value),
+    });
+    this.swatchBtns = FIND_COLORS.map(([val, label, preview]) => h('button', {
+      type: 'button', class: 'mx-find-swatch', 'data-color': val, title: label, 'aria-label': label,
+      'aria-pressed': 'false', style: `background: ${preview}`,
+      onclick: () => { Find.setColor(val); this.closePalette(); },
+    }));
+    this.paletteRow = h('div', { class: 'mx-find-palette', hidden: true },
+      h('span', { class: 'mx-find-palette-label' }, 'Highlight'),
+      ...this.swatchBtns,
+      h('label', { class: 'mx-find-custom-wrap', title: 'Custom color' }, this.customColor),
+    );
+
+    this.replaceInput = h('input', {
+      type: 'text', name: 'replace', class: 'mx-find-input', placeholder: 'Replace…',
+      'aria-label': 'Replace', autocomplete: 'off', spellcheck: 'false',
+      oninput: () => dispatch({ replace: this.replaceInput.value }),
+    });
+    this.replaceBtn = h('button', {
+      type: 'button', name: 'replace', class: 'mx-find-act', title: 'Replace (Enter)',
+      onclick: () => Find.replaceCurrent(v),
+    }, 'Replace');
+    this.replaceAllBtn = h('button', {
+      type: 'button', name: 'replaceAll', class: 'mx-find-act', title: 'Replace all matches',
+      onclick: () => Find.replaceAll(v),
+    }, 'All');
+    this.replaceRow = h('div', { class: 'mx-find-replace-wrap' },
+      h('div', { class: 'mx-find-row mx-find-replace' }, this.replaceInput, this.replaceBtn, this.replaceAllBtn),
+    );
+
+    this.card = h('div', { class: 'cm-search mx-find', role: 'region', 'aria-label': 'Find in note' },
+      h('div', { class: 'mx-find-row mx-find-main' },
+        this.toggleReplaceBtn,
+        h('div', { class: 'mx-find-input-wrap' }, this.searchInput, this.countEl),
+        this.prevBtn, this.nextBtn, this.closeBtn,
+      ),
+      h('div', { class: 'mx-find-row mx-find-opts' },
+        h('div', { class: 'mx-find-toggles' }, this.caseBtn, this.wordBtn, this.reBtn),
+        h('label', { class: 'mx-find-chk', title: 'Fuzzy word matching (typo-tolerant, like Ctrl+O)' }, this.fuzzyChk, 'Fuzzy'),
+        h('label', { class: 'mx-find-chk', title: 'Smoothly scroll to each match' }, this.smoothChk, 'Smooth'),
+        this.colorBtn,
+      ),
+      this.paletteRow,
+      this.replaceRow,
+    );
+
+    this.card.addEventListener('keydown', e => this.onKeydown(e));
+    this.card.addEventListener('mousedown', e => e.stopPropagation());
+    this.searchInput.addEventListener('focus', () => this.closePalette());
+    this.replaceInput.addEventListener('focus', () => this.closePalette());
+    this.anchor = h('div', { class: 'mx-find-anchor' }, this.card);
+    this.syncPrefs();
+  }
+
+  closePalette() {
+    if (!this.paletteOpen) return;
+    this.paletteOpen = false;
+    if (this.paletteRow) this.paletteRow.hidden = true;
+    this.colorBtn?.setAttribute('aria-expanded', 'false');
+  }
+
+  cancelClose() {
+    if (this.closeTimer) { clearTimeout(this.closeTimer); this.closeTimer = null; }
+    if (this.closeEnd && this.card) this.card.removeEventListener('transitionend', this.closeEnd);
+    this.closeEnd = null;
+  }
+
+  cancelOpen() {
+    if (this.openRaf) { cancelAnimationFrame(this.openRaf); this.openRaf = null; }
+  }
+
+  onKeydown(e) {
+    const v = this.view;
+    if (e.key === 'Escape' && !e.isComposing) {
+      e.preventDefault(); e.stopPropagation();
+      if (this.paletteOpen) { this.closePalette(); return; }
+      Find.close(v);
+      return;
+    }
+    const act = Hotkeys.match(e, 'editor');
+    if (act?.id === 'find') {
+      e.preventDefault(); e.stopPropagation();
+      this.focus('search');
+      return;
+    }
+    if (act?.id === 'replace') {
+      e.preventDefault(); e.stopPropagation();
+      if (!v.state.readOnly) {
+        v.dispatch({ effects: findEffect.of({ replaceOpen: true }) });
+        this.focus('replace');
+      }
+      return;
+    }
+    if (e.key === 'F3' || ((e.ctrlKey || e.metaKey) && !e.altKey && hotkey(e) === 'g')) {
+      e.preventDefault(); e.stopPropagation();
+      Find.step(v, e.shiftKey ? -1 : 1);
+      return;
+    }
+    if (e.key === 'Enter' && !e.isComposing) {
+      if (e.target === this.searchInput) {
+        e.preventDefault(); e.stopPropagation();
+        Find.step(v, e.shiftKey ? -1 : 1);
+      } else if (e.target === this.replaceInput) {
+        e.preventDefault(); e.stopPropagation();
+        Find.replaceCurrent(v);
+      }
+    }
+  }
+
+  focus(which = 'search') {
+    if (!this.anchor) this.sync(false);
+    const el = which === 'replace' && !this.view.state.readOnly ? this.replaceInput : this.searchInput;
+    if (!el) return;
+    el.focus();
+    el.select();
+  }
+
+  syncPrefs() {
+    if (!this.card) return;
+    const savedColor = State.data?.editor?.findColor || '';
+    const activeColor = savedColor || FIND_DEFAULT_COLOR;
+    this.smoothChk.checked = Find.smooth();
+    this.colorDot.style.background = activeColor;
+    this.customColor.value = activeColor;
+    for (const b of this.swatchBtns) {
+      const on = b.dataset.color === savedColor;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', String(on));
+    }
+  }
+
+  sync(instant = false) {
+    const fs = this.view.state.field(findField, false);
+    if (!fs || !fs.open) {
+      this.hide(instant);
+      return;
+    }
+    this.cancelClose();
+    const fresh = !this.anchor;
+    if (fresh) {
+      this.build();
+      this.view.dom.prepend(this.anchor);
+    }
+    if (this.card.classList.contains('is-closing') || fresh) {
+      this.card.classList.remove('is-closing');
+      this.cancelOpen();
+      if (instant || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        this.card.classList.add('is-open');
+      } else {
+        const card = this.card;
+        this.openRaf = requestAnimationFrame(() => {
+          this.openRaf = null;
+          if (this.card === card && !card.classList.contains('is-closing')) card.classList.add('is-open');
+        });
+      }
+    }
+    const ro = this.view.state.readOnly;
+    if (this.searchInput.value !== fs.query) this.searchInput.value = fs.query;
+    if (this.replaceInput.value !== fs.replace) this.replaceInput.value = fs.replace;
+    const setOpt = (btn, on) => { btn.classList.toggle('is-active', on); btn.setAttribute('aria-pressed', String(on)); };
+    setOpt(this.caseBtn, fs.caseSensitive);
+    setOpt(this.wordBtn, fs.wholeWord);
+    setOpt(this.reBtn, fs.regexp);
+    this.fuzzyChk.checked = fs.fuzzy;
+    this.smoothChk.checked = Find.smooth();
+
+    const n = fs.matches.length;
+    if (!fs.query) {
+      this.countEl.textContent = '';
+      this.countEl.classList.remove('is-empty', 'is-error');
+      this.searchInput.removeAttribute('title');
+    } else if (fs.error) {
+      this.countEl.textContent = 'Invalid';
+      this.countEl.classList.add('is-error');
+      this.countEl.classList.remove('is-empty');
+      this.searchInput.title = fs.error;
+    } else {
+      this.countEl.textContent = n ? `${fs.index + 1} / ${n}${fs.capped ? '+' : ''}` : '0 / 0';
+      this.countEl.classList.toggle('is-empty', !n);
+      this.countEl.classList.remove('is-error');
+      this.searchInput.removeAttribute('title');
+    }
+    const disableBtn = (btn, off, fallback) => {
+      if (off && document.activeElement === btn) fallback.focus();
+      btn.disabled = off;
+    };
+    disableBtn(this.prevBtn, !n, this.searchInput);
+    disableBtn(this.nextBtn, !n, this.searchInput);
+
+    const showReplace = !ro && fs.replaceOpen;
+    this.toggleReplaceBtn.hidden = ro;
+    this.toggleReplaceBtn.classList.toggle('is-open', showReplace);
+    this.toggleReplaceBtn.setAttribute('aria-expanded', String(showReplace));
+    this.replaceRow.classList.toggle('is-open', showReplace);
+    disableBtn(this.replaceBtn, ro || !n || fs.index < 0, showReplace ? this.replaceInput : this.searchInput);
+    disableBtn(this.replaceAllBtn, ro || !n, showReplace ? this.replaceInput : this.searchInput);
+    this.syncPrefs();
+  }
+
+  hide(instant = false) {
+    if (!this.anchor) return;
+    this.cancelOpen();
+    const removeNow = () => {
+      this.cancelClose();
+      this.cancelOpen();
+      this.anchor?.remove();
+      this.anchor = this.card = null;
+      this.paletteOpen = false;
+    };
+    if (instant || matchMedia('(prefers-reduced-motion: reduce)').matches) return removeNow();
+    if (this.closeTimer) return;
+    const card = this.card;
+    card.classList.remove('is-open');
+    card.classList.add('is-closing');
+    this.closeEnd = e => { if (e.target === card) removeNow(); };
+    card.addEventListener('transitionend', this.closeEnd);
+    this.closeTimer = setTimeout(removeNow, 175);
+  }
+
+  update(u) {
+    if (u.transactions.some(tr => tr.selection && !tr.isUserEvent('input.replace')
+      && (tr.isUserEvent('select') || tr.isUserEvent('input') || tr.isUserEvent('delete') || tr.isUserEvent('move')))) this.userMoved = true;
+    if (u.state.field(findField, false) !== u.startState.field(findField, false) || u.state.readOnly !== u.startState.readOnly) {
+      this.sync(false);
+    }
+  }
+
+  destroy() {
+    Find.cancelScroll(this.view);
+    this.hide(true);
+    if (Find.panels.get(this.view) === this) Find.panels.delete(this.view);
+  }
+}
+
+const findPlugin = CM.ViewPlugin.fromClass(FindPanel);
+
+const findStepOrOpen = dir => v => Find.isOpen(v) ? (Find.step(v, dir), true) : Find.open(v);
+
+const findKeymap = keymap.of([
+  { key: 'F3', run: findStepOrOpen(1), shift: findStepOrOpen(-1), preventDefault: true },
+  { key: 'Mod-g', run: findStepOrOpen(1), shift: findStepOrOpen(-1), preventDefault: true },
+]);
+
+const findExt = [findField, findPlugin, findKeymap];
 
 /* ===== src/js/65-live.js ===== */
 /* ---------- Obsidian markdown syntax for CodeMirror + Live Preview ----------
@@ -21348,8 +22441,13 @@ function buildLive(state) {
   // Like Obsidian: inline markup (emphasis, code, links, tags, embeds) shows its source only for the element
   // the caret/selection touches (edges included, so typing right after ** or ]] works); headings, quotes, rules
   // and blocks reveal per line or per block.
+  // While stepping Ctrl+F matches, lines stay rendered in Live Preview; only replaced widgets or hidden ranges
+  // that directly contain the active match reveal so the match stays visible.
+  const findCur = findActiveMatch(state);
+  const findIn = (from, to) => !!(findCur && findCur.from < to && findCur.to > from);
+  const findInBlock = (from, to) => !!findCur && findIn(doc.lineAt(from).from, doc.lineAt(Math.max(from, to - 1)).to);
   const touches = (from, to) => ranges.some(r => r.from <= to && r.to >= from);
-  const hide = (from, to) => { if (to > from) out.push(Decoration.replace({}).range(from, to)); };
+  const hide = (from, to) => { if (to > from && !findIn(from, to)) out.push(Decoration.replace({}).range(from, to)); };
   const lineCls = (pos, cls, attributes) => out.push(Decoration.line({ class: cls, attributes }).range(doc.lineAt(pos).from));
   const mark = (from, to, cls, attributes) => { if (to > from) out.push(Decoration.mark({ class: cls, attributes }).range(from, to)); };
   const block = (from, to) => {
@@ -21392,7 +22490,7 @@ function buildLive(state) {
           return;
         case 'WikiEmbed': case 'Image': {
           const src = doc.sliceString(n.from, n.to);
-          if (!touches(n.from, n.to)) { out.push(Decoration.replace({ widget: new RenderW(src, false) }).range(n.from, n.to)); return false; }
+          if (!touches(n.from, n.to) && !findIn(n.from, n.to)) { out.push(Decoration.replace({ widget: new RenderW(src, false) }).range(n.from, n.to)); return false; }
           // Like Obsidian, an image stays visible after its source while the caret is on it.
           if (n.name === 'Image' || /\.(png|jpe?g|gif|webp|bmp|avif|svg)(\|[^\]]*)?\]\]$/i.test(src)) out.push(Decoration.widget({ widget: new RenderW(src, false), side: 1 }).range(n.to));
           return;
@@ -21431,12 +22529,12 @@ function buildLive(state) {
           // The bullet / checkbox stays rendered while typing in the item; it turns into source only at the marker.
           if (touches(n.from, task ? task.to : n.to)) return;
           if (task) hide(n.from, task.from);
-          else if (/^[-*+]$/.test(doc.sliceString(n.from, n.to))) out.push(Decoration.replace({ widget: new SimpleW('bullet', n.from) }).range(n.from, n.to));
+          else if (!findIn(n.from, n.to) && /^[-*+]$/.test(doc.sliceString(n.from, n.to))) out.push(Decoration.replace({ widget: new SimpleW('bullet', n.from) }).range(n.from, n.to));
           return;
         }
         case 'TaskMarker': {
           const done = /[xX]/.test(doc.sliceString(n.from + 1, n.from + 2));
-          if (!touches(n.from, n.to)) out.push(Decoration.replace({ widget: new CheckW(doc.sliceString(n.from + 1, n.from + 2) !== ' ', n.from) }).range(n.from, n.to));
+          if (!touches(n.from, n.to) && !findIn(n.from, n.to)) out.push(Decoration.replace({ widget: new CheckW(doc.sliceString(n.from + 1, n.from + 2) !== ' ', n.from) }).range(n.from, n.to));
           // Strike only the item text, not the indent or checkbox of nested items.
           if (done) mark(doc.sliceString(n.to, n.to + 1) === ' ' ? n.to + 1 : n.to, doc.lineAt(n.to).to, 'mx-task-done');
           return;
@@ -21444,7 +22542,7 @@ function buildLive(state) {
         case 'Blockquote': {
           const nested = hasAncestor(node, ['Blockquote', 'ListItem']);
           if (!nested && CALLOUT_RE.test(doc.sliceString(n.from, Math.min(n.to, n.from + 200)))) {
-            if (!isActive(n.from, n.to)) { block(n.from, n.to); return false; }
+            if (!isActive(n.from, n.to) && !findInBlock(n.from, n.to)) { block(n.from, n.to); return false; }
           }
           for (let l = doc.lineAt(n.from); ; l = doc.line(l.number + 1)) {
             lineCls(l.from, 'HyperMD-quote');
@@ -21456,7 +22554,7 @@ function buildLive(state) {
           if (!isActive(n.from, n.to)) hide(n.from, doc.sliceString(n.to, n.to + 1) === ' ' ? n.to + 1 : n.to);
           return;
         case 'CodeBlock': case 'FencedCode': case 'Table': case 'Frontmatter':
-          if (name !== 'CodeBlock' && !isActive(n.from, n.to) && !hasAncestor(node, ['Blockquote', 'ListItem'])) { block(n.from, n.to); return false; }
+          if (name !== 'CodeBlock' && !isActive(n.from, n.to) && !findInBlock(n.from, n.to) && !hasAncestor(node, ['Blockquote', 'ListItem'])) { block(n.from, n.to); return false; }
           if (name === 'FencedCode' || name === 'CodeBlock') {
             for (let l = doc.lineAt(n.from); ; l = doc.line(l.number + 1)) {
               lineCls(l.from, 'HyperMD-codeblock');
@@ -21466,17 +22564,19 @@ function buildLive(state) {
           }
           return;
         case 'HTMLBlock':
-          if (!isActive(n.from, n.to) && !hasAncestor(node, ['Blockquote', 'ListItem']) && !doc.sliceString(n.from, n.from + 4).startsWith('<!--')) { block(n.from, n.to); return false; }
+          if (!isActive(n.from, n.to) && !findInBlock(n.from, n.to) && !hasAncestor(node, ['Blockquote', 'ListItem']) && !doc.sliceString(n.from, n.from + 4).startsWith('<!--')) { block(n.from, n.to); return false; }
           return;
         case 'Paragraph':
           // Inline HTML (<font>, <span style>, <kbd>…) renders like Obsidian when the caret is elsewhere.
           if (!node.getChild('HTMLTag') || isActive(n.from, n.to)) return;
-          if (doc.lineAt(n.from).number === doc.lineAt(n.to).number) out.push(Decoration.replace({ widget: new RenderW(doc.sliceString(n.from, n.to), false) }).range(n.from, n.to));
-          else if (!hasAncestor(node, ['Blockquote', 'ListItem'])) block(n.from, n.to);
+          if (doc.lineAt(n.from).number === doc.lineAt(n.to).number) {
+            if (findIn(n.from, n.to)) return;
+            out.push(Decoration.replace({ widget: new RenderW(doc.sliceString(n.from, n.to), false) }).range(n.from, n.to));
+          } else if (!hasAncestor(node, ['Blockquote', 'ListItem']) && !findInBlock(n.from, n.to)) block(n.from, n.to);
           else return;
           return false;
         case 'HorizontalRule':
-          if (!isActive(n.from, n.to)) out.push(Decoration.replace({ widget: new SimpleW('hr') }).range(n.from, n.to));
+          if (!isActive(n.from, n.to) && !findIn(n.from, n.to)) out.push(Decoration.replace({ widget: new SimpleW('hr') }).range(n.from, n.to));
           return;
       }
     },
@@ -21581,7 +22681,13 @@ window.mxLiveDebug = () => {
 const liveField = StateField.define({
   create: state => safeLive(state),
   update(deco, tr) {
-    if (tr.docChanged || tr.selection || tr.reconfigured || CM.syntaxTree(tr.state) !== CM.syntaxTree(tr.startState)) return safeLive(tr.state, deco, tr);
+    if (tr.docChanged || tr.selection || tr.reconfigured || CM.syntaxTree(tr.state) !== CM.syntaxTree(tr.startState)) {
+      return safeLive(tr.state, deco, tr);
+    }
+    if (tr.state.facet(liveFacet)) {
+      const a = findActiveMatch(tr.state), b = findActiveMatch(tr.startState);
+      if (a?.from !== b?.from || a?.to !== b?.to) return safeLive(tr.state, deco, tr);
+    }
     return deco;
   },
   provide: f => EditorView.decorations.from(f),
@@ -22982,6 +24088,7 @@ const App = {
     this.applyCodeCopySetting();
     this.applyChecklistSetting();
     this.applyLineWidth();
+    this.applyFindSetting();
     this.refreshKeyLabels();   // tooltips name the vault's own hotkeys (91-hotkeys.js)
     try { await this.applyFavicon(); } catch (e) { $('#app-favicon').href = this.defaultFavicon; toast('Could not load vault icon: ' + e.message); }
     // Obsidian config is read-only input. All settings UI changes belong to State (.maxidian).
@@ -23277,6 +24384,7 @@ const App = {
     Split.el.classList.toggle('mod-active', split);
     Split.el.querySelector('.mx-split-tab.is-active')?.classList.toggle('mod-active', split);
     Split.leaf.classList.toggle('mod-active', split);
+    Split.el.querySelector('.mx-split-title')?.classList.toggle('is-renaming', !!(this._renaming && Split.doc?.path === this._renaming.oldPath));
     this.el.root.classList.toggle('mx-has-split', !Split.el.hidden);
     if (this.vault && this.activeDoc()?.path !== this._markedPath) this.markActiveInTree();
   },
@@ -23787,7 +24895,9 @@ const App = {
 
   updateHeader() {
     const tab = this.tabs[this.active];
-    if (this.cur && tab?.kind !== 'changes' && !this.el.title.querySelector('input')) this.el.title.textContent = this.cur.path;
+    const ren = this._renaming && this.cur?.path === this._renaming.oldPath && tab?.kind !== 'changes' ? this._renaming : null;
+    this.el.title.classList.toggle('is-renaming', !!ren);
+    if (this.cur && tab?.kind !== 'changes' && !this.el.title.querySelector('input')) this.el.title.textContent = ren ? ren.newPath : this.cur.path;
     $('#nav-back').disabled = !tab || tab.kind === 'changes' || !tab.back?.length;
     $('#nav-forward').disabled = !tab || tab.kind === 'changes' || !tab.fwd?.length;
     const on = !!(this.cur && Favorites.has(this.cur.path));
@@ -23890,6 +25000,12 @@ const App = {
     ed.checkedOpacity = o; ed.checkedStrike = ed.checkedStrike !== false;
     document.body.style.setProperty('--mx-checked-opacity', String(o));
     document.body.classList.toggle('mx-checked-no-strike', !ed.checkedStrike);
+  },
+  applyFindSetting() {
+    const c = State.data?.editor?.findColor || '';
+    if (c) document.body.style.setProperty('--mx-find-color', c);
+    else document.body.style.removeProperty('--mx-find-color');
+    Find.syncPrefs();
   },
 
   async applyFavicon() {
@@ -24320,9 +25436,19 @@ const App = {
     const watch = setInterval(() => { if (!input.isConnected) finish(false); else place(); }, 300);
     const finish = (commit, blurred = false) => {
       if (done) return; done = true; clearInterval(watch); tip.remove();
-      const name = input.value.trim(); el.textContent = original;
-      if (blurred) { if (name && name !== value) toast('Rename cancelled \u2014 press Enter to rename'); return; }
-      if (commit && name) { const bad = nameError(name, note); if (bad) return toast(bad); rename(name); }
+      const name = input.value.trim();
+      if (blurred) { el.textContent = original; if (name && name !== value) toast('Rename cancelled \u2014 press Enter to rename'); return; }
+      if (commit && name) {
+        const bad = nameError(name, note);
+        if (bad) { el.textContent = original; return toast(bad); }
+        if (name === value) { el.textContent = original; return; }
+        // Restore the original label before starting rename: markRenaming applies the optimistic state synchronously
+        // when the rename proceeds, so early returns (busy/scanning or same path) never leave stale text behind.
+        el.textContent = original;
+        rename(name);
+        return;
+      }
+      el.textContent = original;
     };
     input.addEventListener('click', e => e.stopPropagation());
     input.addEventListener('dblclick', e => e.stopPropagation());
@@ -24345,18 +25471,90 @@ const App = {
     this.inlineEdit(el, basename(path), 'Rename folder', basename(path), name => this.renameFolder(path, joinPath(dirname(path), name)));
   },
 
+  // Optimistically display the new name with a subtle spinner while renameFile/renameFolder runs
+  // (avoids snapping back to the old name during link scanning and verified disk copy).
+  markRenaming(oldPath, newPath, isFolder = false) {
+    const sel = isFolder ? `.nav-folder-title[data-path="${CSS.escape(oldPath)}"]` : `.nav-file-title[data-path="${CSS.escape(oldPath)}"]`;
+    const row = $(sel, this.el.tree);
+    const content = row?.querySelector(isFolder ? '.nav-folder-title-content' : '.nav-file-title-content');
+    const filteredFlat = !isFolder && !!content && (content.classList.contains('mx-tree-filter-match') || row.parentElement?.parentElement === this.el.tree);
+    const origLabel = content && !content.querySelector('input') ? content.textContent
+      : isFolder ? basename(oldPath) : (this.vault.files.get(oldPath)?.ext === 'md' ? noteTitle(oldPath) : basename(oldPath));
+    const nextLabel = filteredFlat ? newPath : isFolder ? basename(newPath) : (extname(newPath) === 'md' ? noteTitle(newPath) : basename(newPath));
+    const beforeTop = row ? row.getBoundingClientRect().top : null;
+    let spinner = null;
+    if (row && content) {
+      content.textContent = nextLabel;
+      row.classList.add('is-renaming');
+      row.setAttribute('aria-busy', 'true');
+      spinner = h('span', { class: 'mx-spinner', 'aria-hidden': 'true' });
+      row.append(spinner);
+    }
+    const token = !isFolder ? { oldPath, newPath } : null;
+    if (token) this._renaming = token;
+    const headerTitle = !isFolder && this.cur?.path === oldPath && this.tabs[this.active]?.kind !== 'changes' ? this.el.title : null;
+    if (headerTitle) { headerTitle.textContent = newPath; headerTitle.classList.add('is-renaming'); }
+    const splitTitle = !isFolder && Split.doc?.path === oldPath ? Split.el?.querySelector('.mx-split-title') : null;
+    if (splitTitle) { splitTitle.textContent = newPath; splitTitle.classList.add('is-renaming'); }
+    return {
+      done: (ok, finalPath = newPath) => {
+        if (token && this._renaming === token) this._renaming = null;
+        if (!isFolder) {
+          this.el.title.classList.remove('is-renaming');
+          if (!ok && this.cur?.path === oldPath && this.tabs[this.active]?.kind !== 'changes' && !this.el.title.querySelector('input')) this.el.title.textContent = oldPath;
+          const curSplitTitle = Split.el?.querySelector('.mx-split-title');
+          if (curSplitTitle) {
+            curSplitTitle.classList.remove('is-renaming');
+            if (!ok && Split.doc?.path === oldPath && !curSplitTitle.querySelector('input')) curSplitTitle.textContent = oldPath;
+          }
+        }
+        if (ok) {
+          const settledSel = isFolder ? `.nav-folder-title[data-path="${CSS.escape(finalPath)}"]` : `.nav-file-title[data-path="${CSS.escape(finalPath)}"]`;
+          const settled = $(settledSel, this.el.tree);
+          if (settled && beforeTop !== null && Math.abs(settled.getBoundingClientRect().top - beforeTop) > 4) {
+            settled.classList.add('is-flashing');
+            setTimeout(() => settled.classList.remove('is-flashing'), 1200);
+          }
+          return;
+        }
+        if (row?.isConnected) {
+          if (content) content.textContent = origLabel;
+          row.classList.remove('is-renaming');
+          row.removeAttribute('aria-busy');
+          spinner?.remove();
+        }
+      },
+    };
+  },
+
   async planLinkMoves(vault, moves, previous = null) {
     const plans = [], notes = [], after = movedVault(vault, moves); let skipped = 0, codeSkipped = 0;
     const frozen = previous ? vault : Object.assign(movedVault(vault, new Map()), { resolve: Vault.prototype.resolve });   // the vault before the move, for rewrite()
-    for (const f of previous ? previous.map(p => p.f) : vault.notes()) {
-      try {
-        const prior = previous?.find(p => p.f.path === f.path);
-        const opened = prior ? prior.opened : this.docs.get(f.path), disk = prior ? prior.disk : await vault.read(f.path), text = prior ? prior.original : opened ? opened.text : disk.text;
-        const note = { f, disk, opened, original: text }; notes.push(note);
-        const update = rewriteMovedLinks(text, f.path, null, null, vault, after, moves);
-        if (update.changes && hasMultilineCodeLinks(text)) { skipped++; codeSkipped++; }
-        else if (update.changes) plans.push({ ...note, update, rewrite: t => rewriteMovedLinks(t, f.path, null, null, frozen, after, moves) });
-      } catch { skipped++; }
+    const list = previous ? previous.map(p => p.f) : vault.notes();
+    const priorByPath = previous ? new Map(previous.map(p => [p.f.path, p])) : null;
+    // Bounded parallel reads (read-only; saves are held by flushBeforeMove) preserve deterministic order.
+    const results = new Array(list.length);
+    let idx = 0;
+    const worker = async () => {
+      while (idx < list.length) {
+        const i = idx++, f = list[i];
+        try {
+          const prior = priorByPath?.get(f.path);
+          const opened = prior ? prior.opened : this.docs.get(f.path);
+          const disk = prior ? prior.disk : await vault.read(f.path);
+          const text = prior ? prior.original : opened ? opened.text : disk.text;
+          const note = { f, disk, opened, original: text };
+          const update = rewriteMovedLinks(text, f.path, null, null, vault, after, moves);
+          results[i] = { note, update };
+        } catch { results[i] = { failed: true }; }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(8, Math.max(1, list.length)) }, worker));
+    for (const r of results) {
+      if (!r || r.failed) { skipped++; continue; }
+      notes.push(r.note);
+      if (r.update.changes && hasMultilineCodeLinks(r.note.original)) { skipped++; codeSkipped++; }
+      else if (r.update.changes) plans.push({ ...r.note, update: r.update, rewrite: t => rewriteMovedLinks(t, r.note.f.path, null, null, frozen, after, moves) });
     }
     return { plans, notes, skipped, codeSkipped };
   },
@@ -24440,9 +25638,11 @@ const App = {
   async renameFolder(oldPath, newPath, inside = false, temporary = false) {
     if (!inside && (this.fileOpsBusy || this.scanning)) { toast('Another file operation is in progress'); return false; }
     if (!inside) this.fileOpsBusy = true;
+    const pending = !inside && oldPath && newPath && oldPath !== newPath ? this.markRenaming(oldPath, newPath, true) : null;
+    let ok = false;
     try {
       assertWritableVaultPath(oldPath); assertWritableVaultPath(newPath);
-      if (oldPath === newPath) return true;
+      if (oldPath === newPath) return (ok = true);
       if (!oldPath || !newPath || newPath.split('/').some(s => !s || s.startsWith('.') || endsBadly(s) || /[\\:*?"<>|\[\]#^]/.test(s)) || newPath.toLowerCase().startsWith(oldPath.toLowerCase() + '/')) throw new Error('Invalid folder path');
       if (!inside) await this.flushBeforeMove(new Map([...this.vault.files.keys()].filter(p => p.startsWith(oldPath + '/')).map(p => [p, newPath + p.slice(oldPath.length)])));
       const vault = this.vault, source = await vault.dirHandle(oldPath), files = [], dirs = [];
@@ -24457,7 +25657,8 @@ const App = {
       };
       await collect(source, oldPath);
       if (oldPath.toLowerCase() === newPath.toLowerCase()) {
-        return await this.renameCase(oldPath, newPath, files, true);
+        ok = await this.renameCase(oldPath, newPath, files, true);
+        return ok;
       }
       try { await vault.dirHandle(newPath); throw new Error('Destination folder already exists'); }
       catch (e) { if (e.name !== 'NotFoundError') throw e; }
@@ -24493,9 +25694,9 @@ const App = {
       State.data.expanded = State.data.expanded.map(p => p === oldPath || p.startsWith(oldPath + '/') ? newPath + p.slice(oldPath.length) : p);
       if ([...Favorites.walk()].some(it => it.type === 'folder' && (it.path === oldPath || it.path?.startsWith(oldPath + '/')))) await Favorites.modify(data => { for (const it of Favorites.walk(data.items)) if (it.type === 'folder' && (it.path === oldPath || it.path?.startsWith(oldPath + '/'))) it.path = newPath + it.path.slice(oldPath.length); });
       await vault.scan(); this.renderTree(); this.renderRecent(); Favorites.render(); State.save();
-      toast('Moved folder to ' + newPath, 8000); return true;
+      toast('Moved folder to ' + newPath, 8000); ok = true; return true;
     } catch (e) { toast('Could not move folder: ' + e.message, 10000); return false; }
-    finally { if (!inside) { this.fileOpsBusy = false; this.releaseSaves(); } }
+    finally { pending?.done(ok, newPath); if (!inside) { this.fileOpsBusy = false; this.releaseSaves(); } }
   },
 
   // Removal guard of a move: looks the note up again at removal time (it may have been opened since),
@@ -24508,15 +25709,18 @@ const App = {
     if (!inside && (this.fileOpsBusy || this.scanning)) { toast('Another file operation is in progress'); return false; }
     if (!inside) this.fileOpsBusy = true;
     this.moving.add(oldPath); this.moving.add(newPath);
+    const pending = !inside && oldPath && newPath && oldPath !== newPath ? this.markRenaming(oldPath, newPath, false) : null;
+    let ok = false;
     try {
-      if (oldPath === newPath) return true;
+      if (oldPath === newPath) return (ok = true);
       if (!newPath || newPath.split('/').some(s => !s || s.startsWith('.') || endsBadly(s) || /[\\:*?"<>|\[\]#^]/.test(s))) throw new Error('Invalid file path');
       if (!inside) await this.flushBeforeMove(new Map([[oldPath, newPath]]));
       const vault = this.vault, file = vault.files.get(oldPath), doc = this.docs.get(oldPath);
       if (!file) throw new Error('File not found');
       if (extname(oldPath) !== extname(newPath)) throw new Error('The file extension must stay the same');
       if (oldPath.toLowerCase() === newPath.toLowerCase()) {
-        return await this.renameCase(oldPath, newPath, [oldPath]);
+        ok = await this.renameCase(oldPath, newPath, [oldPath]);
+        return ok;
       }
       if (vault.byLowerPath.has(newPath.toLowerCase())) throw new Error('Destination already exists');
       if (doc?.dirty || doc?.saving) await this.saveNow(doc);
@@ -24543,9 +25747,9 @@ const App = {
       if ([...Favorites.walk()].some(it => it.type === 'file' && it.path === oldPath)) await Favorites.modify(data => { for (const it of Favorites.walk(data.items)) if (it.type === 'file' && it.path === oldPath) it.path = newPath; });
       this.persistTabs(); State.save(); this.renderTabs(); this.renderTree(); this.renderRecent(); this.updateHeader(); this.renderPreviewIfOpen(); this.renderBacklinks();
       toast(`Renamed. Updated ${updated} links in ${files} files${skipped ? `; ${skipped} files skipped${codeSkipped ? ` (${codeSkipped} contain multiline code)` : ''}` : ''}`, 8000);
-      return true;
+      ok = true; return true;
     } catch (e) { toast('Could not rename file: ' + e.message, 8000); return false; }
-    finally { if (!inside) { this.fileOpsBusy = false; this.releaseSaves(); } this.moving.delete(oldPath); this.moving.delete(newPath); }
+    finally { pending?.done(ok, newPath); if (!inside) { this.fileOpsBusy = false; this.releaseSaves(); } this.moving.delete(oldPath); this.moving.delete(newPath); }
   },
 
   async trashFile(path) {
@@ -24734,7 +25938,7 @@ const App = {
           if (st === 'deleted') { doc.deleted = true; this.renderBanner(); this.strandedNotice(doc); return; }
           if (st) { doc.conflict = st; this.renderBanner(); this.strandedNotice(doc); return; }
         }
-        if (doc === this.cur) this.status('save', 'Saving…');
+        if (doc === this.activeDoc()) this.status('save', 'Saving…');
         // Overwriting a conflicting disk version: it must be in the history first, or nothing is written.
         if (force) {
           if (await History.snapshot(this.vault, doc, true) === 'failed') { toast('Not overwritten: could not save a recovery snapshot of the disk version first', 8000); return; }
@@ -24890,6 +26094,7 @@ const App = {
     if (key === 'save') {
       el.textContent = ''; el.title = text || 'Ready'; el.setAttribute('aria-label', text || 'Ready');
       el.dataset.state = /fail|conflict|deleted/i.test(text) ? 'error' : text === 'Saved' || !text ? 'saved' : 'pending';
+      el.classList.toggle('is-saving', text === 'Saving…');
       el.hidden = false;
     } else { el.textContent = text; el.hidden = !text; }
   },
@@ -25219,6 +26424,24 @@ Object.assign(App, {
     checkedOpacity.value = State.data.editor.checkedOpacity;
     showOpacity();
     checkedOpacity.addEventListener('input', () => { State.data.editor.checkedOpacity = Number(checkedOpacity.value); this.applyChecklistSetting(); showOpacity(); State.save(); });
+    const findCustomColor = h('input', { type: 'color', class: 'mx-find-color-custom', 'aria-label': 'Custom find highlight color', value: Find.color() });
+    const findSwatches = FIND_COLORS.map(([val, label, preview]) => h('button', {
+      type: 'button', class: 'mx-find-swatch', 'data-color': val, title: label, 'aria-label': label,
+      style: `background: ${preview}`,
+      onclick: () => { Find.setColor(val); syncFindSwatches(); },
+    }));
+    const syncFindSwatches = () => {
+      const saved = State.data.editor.findColor || '';
+      findCustomColor.value = saved || FIND_DEFAULT_COLOR;
+      for (const b of findSwatches) {
+        const active = b.dataset.color === saved;
+        b.classList.toggle('is-active', active);
+        b.setAttribute('aria-pressed', String(active));
+      }
+    };
+    findCustomColor.addEventListener('input', () => { Find.setColor(findCustomColor.value); syncFindSwatches(); });
+    syncFindSwatches();
+    const findColorControl = h('div', { class: 'mx-find-settings-colors' }, ...findSwatches, h('label', { class: 'mx-find-custom-wrap', title: 'Custom color' }, findCustomColor));
     // Single-mode built-in palettes (see Theme.isDark) ignore the light/dark choice.
     const modeHint = 'Follow Obsidian uses .obsidian/appearance.json';
     const modeSel = sel(st.mode || '', [['', 'Follow Obsidian / system'], ['system', 'System'], ['dark', 'Dark'], ['light', 'Light']], v => { st.mode = v; apply(); });
@@ -25240,6 +26463,8 @@ Object.assign(App, {
       row('Always show code copy buttons', 'Keep code copy buttons visible at low opacity; hovering makes them fully visible.', toggle(State.data.editor.codeCopyVisible !== false, v => { State.data.editor.codeCopyVisible = v; this.applyCodeCopySetting(); State.save(); })),
       row('Checked items opacity', 'Fade completed checklist items in Reading view and Editing view. 100% leaves them unchanged.', h('div', { class: 'mx-range' }, checkedOpacity, opacityLabel)),
       row('Checked items strikethrough', 'Draw a line through completed checklist items.', toggle(State.data.editor.checkedStrike !== false, v => { State.data.editor.checkedStrike = v; this.applyChecklistSetting(); State.save(); })),
+      row('Find highlight color', 'Highlight color for on-page Ctrl+F matches and the focused match ring.', findColorControl),
+      row('Smooth scroll to find matches', 'Smoothly glide to each match when stepping through Ctrl+F results.', toggle(Find.smooth(), v => Find.setSmooth(v))),
       h('details', { class: 'mx-group' }, h('summary', null, 'Heading sizes'),
         ...[1, 2, 3, 4, 5, 6].map(n => row('H' + n + ' size (em)', n === 1 ? 'Blank uses the theme size. Applies to Reading view and Editing view.' : null, headingSize(n))))
       ],
@@ -25308,6 +26533,22 @@ Object.assign(App, {
         h('a', { href: '#', onclick: e => { e.preventDefault(); st.overrides = {}; apply(); m.close(); this.openSettings(); } }, 'Reset')),
       ...groups.filter(g => g.rows.length).map(g => h('details', { class: 'mx-group' }, h('summary', null, g.title), ...g.rows)),
     ];
+    const helpRow = (name, desc, keys) => h('div', { class: 'setting-item' },
+      h('div', { class: 'setting-item-info' }, h('div', { class: 'setting-item-name' }, name), h('div', { class: 'setting-item-description' }, desc)),
+      keys?.length ? h('div', { class: 'mx-hk-keys' }, ...keys.map(k => h('kbd', null, k))) : null);
+    const helpPanel = [
+      h('div', { class: 'setting-item-description mx-help-intro' }, 'Shortcuts and editor tips that are easy to miss. Remappable shortcuts can be changed under Hotkeys.'),
+      h('div', { class: 'mx-help-group' }, 'Keyboard & navigation'),
+      helpRow('Select word', 'Select the word under the cursor in single-cursor mode (also blocks the browser bookmark dialog).', ['Ctrl+D']),
+      helpRow('Go to line', 'Jump to a line number; supports +N / -N relative jumps and line:col.', ['Ctrl+Alt+G']),
+      helpRow('Next / previous find match', 'Step to the next or previous on-page Find match, even while focus is inside the editor.', ['Ctrl+G', 'Ctrl+Shift+G', 'F3', 'Shift+F3']),
+      helpRow('Quick note switcher', 'Double-tap Ctrl to find a note by filename (switches an open search modal too).', [this.keyLabel('switcher') || 'Ctrl x2']),
+      h('div', { class: 'mx-help-group' }, 'Editor & workspace'),
+      helpRow('Drag list items', 'In Live Preview, drag a bullet or checkbox to reorder list items along with nested sub-items; move sideways to change the nesting level. One undo step.'),
+      helpRow('Selection helpers', 'Type *, _, =, or ~ to wrap selected text, or paste a URL over selected text to create a Markdown link.'),
+      helpRow('Split pane & tabs', 'Drag a tab to the right side of the editor for a split pane. Middle-click any internal link to open it in a new tab.'),
+      helpRow('Sidebar auto-hide', 'Right-click either sidebar toggle button to configure the minimum editor width for auto-hiding sidebars.'),
+    ];
     const panels = [
       ['Editor', panelRows.Editor],
       ['Appearance', panelRows.Appearance],
@@ -25322,6 +26563,7 @@ Object.assign(App, {
       ]],
       ['Trash', this.trashPanel(row, toggle)],
       ['Hotkeys', Hotkeys.panel()],   // recorder and fixed keys: 91-hotkeys.js
+      ['Help', helpPanel],
       ['About', [h('div', { class: 'setting-item-description mx-small' }, 'Maxidian ' + $('#st-version').textContent + ' · theme: AnuPpuccin by AnubisNekhet (GPL-3.0) · marked (MIT) · DOMPurify (Apache-2.0/MPL-2.0) · MiniSearch (MIT) · CodeMirror (MIT) · Prism (MIT) · Turndown (MIT)')]],
     ];
     if (!panels.some(([name]) => name === this.settingsCat)) this.settingsCat = 'Editor';
@@ -25527,6 +26769,13 @@ Object.assign(App, {
         return;
       }
       if (e.isComposing) return;
+      if (e.key === 'Escape' && !mod && !e.altKey && !e.shiftKey && !Suggest.isOpen() && !e.target.closest?.('.cm-search, .cm-goto-line, input, textarea, select')) {
+        // Close Find only in the active visible Editing-view pane; never fall back across panes or into a hidden editor.
+        const fv = Split.active && Split.doc
+          ? (Split.tab?.mode === 'source' ? Split.view : null)
+          : (this.cur && this.el.leaf.dataset.mode === 'source' ? Editor.view : null);
+        if (Find.isOpen(fv)) { e.preventDefault(); e.stopPropagation(); Find.close(fv); return; }
+      }
       const action = Hotkeys.match(e, 'global');
       if (action) { e.preventDefault(); action.run(); return; }
       const ed = Hotkeys.match(e, 'editor');   // Find / Replace from Reading view (92-modes.js)
@@ -26385,7 +27634,13 @@ Object.assign(App, {
     const destination = joinPath(folder, basename(path));
     if (destination === path || type === 'folder' && (folder + '/').startsWith(path + '/')) return false;
     const moved = type === 'folder' ? await this.renameFolder(path, destination) : await this.renameFile(path, destination);
-    if (moved) { if (State.data.files.expandOnMove) this.revealFolder(folder); this.renderTree(); }
+    if (moved && State.data.files.expandOnMove) {
+      this.revealFolder(folder);
+      // revealFolder re-renders the tree, so re-apply the settled flash on the moved row.
+      const sel = (type === 'folder' ? '.nav-folder-title' : '.nav-file-title') + `[data-path="${CSS.escape(destination)}"]`;
+      const settled = $(sel, this.el.tree);
+      if (settled) { settled.classList.add('is-flashing'); setTimeout(() => settled.classList.remove('is-flashing'), 1200); }
+    }
     return moved;
   },
 
@@ -26613,11 +27868,11 @@ const HK_RESERVED = {
 const HK_CM = {
   'Ctrl+D': 'select next occurrence', 'Ctrl+/': 'toggle comment', 'Alt+Up': 'move line up', 'Alt+Down': 'move line down', 'Alt+Shift+Up': 'copy line up',
   'Alt+Shift+Down': 'copy line down', 'Ctrl+Shift+K': 'delete line', 'Ctrl+Enter': 'insert blank line', 'Ctrl+[': 'outdent', 'Ctrl+]': 'indent',
-  'Ctrl+F': 'find', 'Ctrl+G': 'find next', 'Ctrl+Shift+G': 'find previous', 'Ctrl+Shift+L': 'select all matches', 'Alt+G': 'go to line', 'Ctrl+Z': 'undo',
+  'Ctrl+G': 'find next', 'Ctrl+Shift+G': 'find previous', 'Ctrl+Alt+G': 'go to line', 'Ctrl+Z': 'undo',
   'Ctrl+Y': 'redo', 'Ctrl+U': 'undo selection', 'Ctrl+A': 'select all', 'Ctrl+C': 'copy', 'Ctrl+V': 'paste', 'Ctrl+X': 'cut', 'Ctrl+Shift+V': 'paste as plain text',
   'Ctrl+Shift+[': 'fold', 'Ctrl+Shift+]': 'unfold', 'Ctrl+Alt+[': 'fold all', 'Ctrl+Alt+]': 'unfold all', 'Ctrl+Shift+\\': 'go to matching bracket',
   'Alt+L': 'select line', 'Ctrl+Home': 'go to start', 'Ctrl+End': 'go to end', 'Ctrl+Left': 'word left', 'Ctrl+Right': 'word right', 'Ctrl+Backspace': 'delete word',
-  'Ctrl+Delete': 'delete word forward', 'Ctrl+Alt+Up': 'add cursor above', 'Ctrl+Alt+Down': 'add cursor below',
+  'Ctrl+Delete': 'delete word forward',
 };
 
 const focusedEditor = () => [Editor.view, Split.view].find(v => v?.hasFocus) || null;
@@ -26647,15 +27902,15 @@ const Hotkeys = {
     { id: 'sideRight', label: 'Toggle right sidebar', keys: ['Alt+]'], scope: 'global', run: () => App.toggleSide('right') },
     { id: 'reading', label: 'Back to Reading view (in the editor)', keys: ['Esc'], scope: 'editor',
       run: v => {
-        if (CM.searchPanelOpen(v.state)) return false;
+        if (Find.isOpen(v)) { Find.close(v); return true; }
         if (SelMenu.el) SelMenu.hide();   // the first Escape only dismisses the floating menu
         else if (Split.view === v) Split.setMode('preview');
         else App.setMode('preview');
       } },
     // reading: also from Reading view, which first switches that pane to Editing view at the same place (92-modes.js).
-    { id: 'find', label: 'Find in note', keys: ['Ctrl+F'], scope: 'editor', reading: true, run: v => { CM.openSearchPanel(v); } },
+    { id: 'find', label: 'Find in note', keys: ['Ctrl+F'], scope: 'editor', reading: true, run: v => { Find.open(v); } },
     { id: 'replace', label: 'Find and replace in note', keys: ['Ctrl+H'], scope: 'editor', reading: true,
-      run: v => { CM.openSearchPanel(v); v.dom.querySelector('.cm-search input[name=replace]')?.focus(); } },
+      run: v => { Find.open(v, { replace: true }); } },
     { id: 'bold', label: 'Bold', keys: ['Ctrl+B'], scope: 'editor', edit: true, run: v => { toggleWrap(v, '**'); } },
     { id: 'italic', label: 'Italic', keys: ['Ctrl+I'], scope: 'editor', edit: true, run: v => { toggleWrap(v, '*'); } },
     { id: 'strike', label: 'Strikethrough', keys: ['Ctrl+Shift+X'], scope: 'editor', edit: true, run: v => { toggleWrap(v, '~~'); } },
