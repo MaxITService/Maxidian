@@ -14236,7 +14236,7 @@ body.anp-colorful-frame .workspace-tab-header-container > .sidebar-toggle-button
     <div class="status-bar-item" id="st-save" hidden></div>
     <div class="status-bar-item mod-clickable" id="st-changes" title="View changes">Changes</div>
     <div class="status-bar-item mod-clickable" id="st-mode" hidden></div>
-    <div class="status-bar-item mx-version" id="st-version" title="Maxidian version">v1.6.5+b535367</div>
+    <div class="status-bar-item mx-version" id="st-version" title="Maxidian version">v1.6.6+4fe17ef</div>
   </div>
 </div>
 <div class="mx-start" id="start" hidden></div>
@@ -19165,10 +19165,20 @@ async function writeVerified(vault, handle, bytes) {
   throw new Error('verification failed: file on disk differs from what was written');
 }
 
+// A remembered handle can stop answering (seen in Edge: its calls never settle). Bound every call that blocks opening a vault.
+const HANDLE_MS = 2500;
+function answered(promise, ms = HANDLE_MS) {
+  let timer;
+  return Promise.race([promise, new Promise((_, rej) => { timer = setTimeout(() => rej(new DOMException('The browser did not answer', 'TimeoutError')), ms); })])
+    .finally(() => clearTimeout(timer));
+}
+
+// requestPermission itself is never timed out: its prompt may wait for the user (App.grantVault shows a notice meanwhile).
 async function hasPermission(handle, ask) {
   if (typeof handle.queryPermission !== 'function') return true;
   const opts = { mode: 'readwrite' };
-  if ((await handle.queryPermission(opts)) === 'granted') return true;
+  try { if ((await answered(handle.queryPermission(opts))) === 'granted') return true; }
+  catch (e) { if (!ask || e.name !== 'TimeoutError') throw e; }
   return ask ? (await handle.requestPermission(opts)) === 'granted' : false;
 }
 
@@ -19391,7 +19401,8 @@ async function rememberedVaults() {
 async function rememberVault(handle) {
   let list = await rememberedVaults();
   const keep = []; let previous;
-  for (const v of list) { try { if (await v.handle.isSameEntry(handle)) previous = v; else keep.push(v); } catch { keep.push(v); } }
+  const same = await Promise.all(list.map(v => answered(v.handle.isSameEntry(handle)).catch(() => false)));   // unknown: kept as its own entry
+  list.forEach((v, i) => { if (same[i]) previous = v; else keep.push(v); });
   const entry = { id: previous?.id || crypto.randomUUID(), name: handle.name, handle };
   await idb.set('vaults', [entry, ...keep]);
   return entry;
@@ -23987,26 +23998,43 @@ const App = {
     if (window.__maxidianRoot) return this.openVault(await window.__maxidianRoot());
     const wanted = new URLSearchParams(location.hash.slice(1)).get('vault');
     const entry = wanted ? list.find(v => v.id === wanted) : list[0];
-    if (entry && await hasPermission(entry.handle, false).catch(() => false)) return this.openVault(entry.handle, entry.id);
-    this.showStart(entry ? 'Click Open to grant access to “' + entry.name + '”.' : wanted ? 'Choose the vault for this browser tab.' : '', entry?.id);
+    let stuck = false;
+    if (entry && await hasPermission(entry.handle, false).catch(e => { stuck = e.name === 'TimeoutError'; return false; })) return this.openVault(entry.handle, entry.id);
+    this.showStart(stuck ? 'The browser does not answer for “' + entry.name + '”. Choose its folder again with “Open vault folder…”.' : entry ? 'Click Open to grant access to “' + entry.name + '”.' : wanted ? 'Choose the vault for this browser tab.' : '', entry?.id);
   },
 
   /* Ask for folder access from a click. requestPermission needs user activation; when it is
      missing (window.open and slow awaits consume it) ask once more in a modal, never show the raw error. */
   async grantVault(entry, go) {
+    const turn = ++this.grantTurn;   // an answer that arrives after another vault was chosen must not switch to this one
     try {
-      if (await hasPermission(entry.handle, true)) await go(); else toast('Permission denied');
+      const ok = await this.askAccess(entry);
+      if (turn !== this.grantTurn) return;
+      if (ok) await go(); else toast('Permission denied');
     } catch (e) {
+      if (turn !== this.grantTurn) return;
       if (!/activation/i.test(e.message) && e.name !== 'SecurityError' && e.name !== 'NotAllowedError') return toast('Cannot open: ' + e.message);
       const open = h('button', { class: 'mod-cta', onclick: async () => {
-        try { if (await hasPermission(entry.handle, true)) { m.close(); await go(); } else { m.close(); toast('Permission denied'); } }
-        catch (err) { m.close(); toast('Cannot open: ' + err.message); }
+        try { const ok = await this.askAccess(entry); if (turn !== this.grantTurn) return; m.close(); if (ok) await go(); else toast('Permission denied'); }
+        catch (err) { if (turn !== this.grantTurn) return; m.close(); toast('Cannot open: ' + err.message); }
       } }, 'Open vault');
       const m = this.modal(h('div', null, h('div', { class: 'modal-title' }, 'Allow access to “' + entry.name + '”'),
         h('div', { class: 'modal-content' }, 'The browser needs one more click to grant access to this folder.'),
         h('div', { class: 'modal-button-container' }, open, h('button', { onclick: () => m.close() }, 'Cancel'))));
       open.focus();
     }
+  },
+
+  grantTurn: 0,
+  // The permission request may never settle: say so and offer the folder picker (the prompt may also just be waiting for the user).
+  async askAccess(entry) {
+    let notice = null;
+    const timer = setTimeout(() => {
+      notice = toast('The browser has not answered for “' + entry.name + '”. If you see no permission prompt, choose the folder again.', 0,
+        { label: 'Choose folder…', fn: () => this.pickVault() });
+    }, HANDLE_MS + 3500);
+    try { return await hasPermission(entry.handle, true); }
+    finally { clearTimeout(timer); notice?.remove(); }
   },
 
   async showStart(msg = '', wantedId = null) {
@@ -24031,7 +24059,8 @@ const App = {
   async pickVault() {
     try {
       const handle = await window.showDirectoryPicker({ mode: 'readwrite', id: 'maxidian-vault' });
-      const entry = await rememberVault(handle).catch(e => console.warn('IndexedDB unavailable', e));
+      this.grantTurn++; this.launcher?.close();
+      const entry = await answered(rememberVault(handle), HANDLE_MS * 3).catch(e => console.warn('Vault not remembered', e));
       await this.openVault(handle, entry?.id);
     } catch (e) { if (e.name !== 'AbortError') toast('Could not open folder: ' + e.message); }
   },
@@ -24148,12 +24177,12 @@ const App = {
     const list = await rememberedVaults();
     const hashId = new URLSearchParams(location.hash.slice(1)).get('vault');
     const current = new Set();
-    for (const v of list) { try { if (this.vault && (v.id === hashId || await v.handle.isSameEntry(this.vault.root))) current.add(v); } catch { if (v.id === hashId) current.add(v); } }
+    if (this.vault) await Promise.all(list.map(async v => { if (v.id === hashId || await answered(v.handle.isSameEntry(this.vault.root)).catch(() => false)) current.add(v); }));
     const rows = list.map(v => h('div', { class: 'mx-vault-row' + (current.has(v) ? ' is-current' : '') },
       h('span', { class: 'mx-vault-label' }, v.name, current.has(v) ? h('span', { class: 'mx-vault-current' }, ' (current)') : null),
       h('button', { class: 'mod-cta', onclick: () => this.launchVault(v) }, 'Open in new tab'),
       current.has(v) ? null : h('button', { onclick: () => this.grantVault(v, async () => { m.close(); await this.openVault(v.handle, v.id); }) }, 'Replace current vault')));
-    const m = this.modal(h('div', { class: 'mx-vault-launcher' }, h('div', { class: 'modal-title' }, 'Vaults'),
+    const m = this.launcher = this.modal(h('div', { class: 'mx-vault-launcher' }, h('div', { class: 'modal-title' }, 'Vaults'),
       h('p', null, 'Open in new tab keeps this vault open and shows the other vault in its own browser tab. Replace current vault closes this one in this tab (unsaved changes are saved first). Bookmark each tab to reopen its vault. Folder access may need one click after a browser restart.'),
       ...rows, h('button', { onclick: () => { m.close(); this.pickVault(); } }, 'Add / open vault…')));
   },
