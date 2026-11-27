@@ -1,6 +1,7 @@
-### Fixed
-- A remembered vault that the browser no longer answers for (seen in Edge) no longer leaves an empty window: the start screen says so, and opening it offers **Choose folder…**.
-- Choosing a folder is no longer blocked by other remembered vaults that do not answer; **Add / open vault…** and the vault list work again. Such old entries stay in the list, so a vault may be listed twice.
-
 ### New
-- `maxidian.min.html`: the same app, minified to a smaller file.
+- **Copy link** from the right-click menu in Live Preview or Reading view. The menu copies the full URL for a web link or a wiki link for a vault note. Right-click keeps the link rendered.
+- **Remove from note…** is available in the image viewer and the image's right-click menu. The viewer button stays visible while a large image is zoomed or scrolled. You can also press `Delete` in the viewer. Removal asks for confirmation, supports undo, and keeps the image file in the vault.
+- **Edit tables in place in Live Preview.** Click a rendered cell to edit it. `Tab` / `Shift+Tab`, `Enter` and the arrow keys move between cells. `Enter` on the last row adds a row, and `Esc` leaves the table. A `|` typed in a cell is escaped automatically.
+
+### Fixed
+- Right-clicking an image in Live Preview no longer moves the cursor.

@@ -572,6 +572,8 @@ body.mx-checked-no-strike .is-live-preview .mx-task-done { text-decoration: none
 @keyframes mx-caret-blink { 50% { opacity: 0; } }
 .cm-content:has(.mx-after-caret) { caret-color: transparent; }
 .mx-live-block { white-space: normal; cursor: text; padding: 2px 0; }
+.mx-live-block .el-table :is(td, th) { cursor: text; }
+.mx-live-block .el-table :is(td, th).mx-cell-edit { outline: 2px solid var(--interactive-accent); outline-offset: -2px; white-space: pre-wrap; }
 .mx-live-block > div > :first-child { margin-top: 0; } .mx-live-block > div > :last-child { margin-bottom: 0; }
 .mx-live-hr { display: inline-block; width: 100%; vertical-align: middle; border: 0; border-top: 1px solid var(--hr-color, var(--background-modifier-border)); margin: 0; }
 .mx-live-inline img { max-width: 100%; }
@@ -904,10 +906,15 @@ input.task-list-item-checkbox:checked::after {
 .mx-suggest .suggestion-content { flex: 1; min-width: 0; }
 .mx-suggest .suggestion-aux { color: var(--text-faint); font-size: var(--font-ui-smaller); }
 .mx-suggest .suggestion-item { padding: var(--size-4-1) var(--size-4-2); font-size: var(--font-ui-small); }
-.mx-lightbox { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--size-4-2); padding: var(--size-4-6); background: rgba(0, 0, 0, .82); overflow: auto; outline: none; cursor: zoom-out; }
-.mx-lightbox-img { max-width: 100%; max-height: calc(100% - 2.5em); object-fit: contain; cursor: zoom-in; box-shadow: 0 4px 24px rgba(0, 0, 0, .5); }
-.mx-lightbox-img.is-zoomed { max-width: none; max-height: none; cursor: zoom-out; margin: auto; }
-.mx-lightbox-caption { color: #ddd; font-size: var(--font-ui-small); user-select: text; }
+.mx-lightbox { position: fixed; inset: 0; z-index: 60; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: var(--size-4-2); padding: var(--size-4-6); background: rgba(0, 0, 0, .82); outline: none; cursor: zoom-out; }
+.mx-lightbox-stage { display: flex; min-width: 0; overflow: auto; }
+.mx-lightbox-img { flex: none; margin: auto; max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in; box-shadow: 0 4px 24px rgba(0, 0, 0, .5); }
+.mx-lightbox-img.is-zoomed { max-width: none; max-height: none; cursor: zoom-out; }
+.mx-lightbox-bar { display: flex; min-width: 0; align-items: center; justify-content: center; gap: var(--size-4-3); cursor: default; }
+.mx-lightbox-caption { color: #ddd; font-size: var(--font-ui-small); user-select: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mx-lightbox-remove { flex: none; color: #ffb4b4; background: rgba(255, 255, 255, .12); font-size: var(--font-ui-small); box-shadow: none; }
+.mx-lightbox-remove[hidden] { display: none; }
+.mx-lightbox-remove:hover { background: rgba(255, 90, 90, .35); }
 .menu { position: fixed; z-index: 70; background: var(--background-secondary); border: var(--border-width) solid var(--background-modifier-border); border-radius: var(--radius-m); box-shadow: var(--shadow-s); padding: var(--size-2-3); min-width: 200px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow: auto; }
 .menu-item { display: flex; align-items: center; gap: var(--size-4-2); padding: var(--size-4-1) var(--size-4-2); border-radius: var(--radius-s); cursor: pointer; font-size: var(--font-ui-small); width: 100%; text-align: left; background: transparent; box-shadow: none; }
 .menu-item:hover { background: var(--background-modifier-hover); }
@@ -14236,7 +14243,7 @@ body.anp-colorful-frame .workspace-tab-header-container > .sidebar-toggle-button
     <div class="status-bar-item" id="st-save" hidden></div>
     <div class="status-bar-item mod-clickable" id="st-changes" title="View changes">Changes</div>
     <div class="status-bar-item mod-clickable" id="st-mode" hidden></div>
-    <div class="status-bar-item mx-version" id="st-version" title="Maxidian version">v1.6.6+4fe17ef</div>
+    <div class="status-bar-item mx-version" id="st-version" title="Maxidian version">v1.6.7+d1fbeec</div>
   </div>
 </div>
 <div class="mx-start" id="start" hidden></div>
@@ -21261,6 +21268,8 @@ const ListDrag = {
     });
     // A nested block joins the item above directly: after a blank line deep tab indentation may parse as code.
     if (best?.i && destination !== source.start && above + 1 < destination && !ours(above + 1)) { destination = above + 1; after = true; }
+    // A nested block joins the item above directly: after a blank line deep tab indentation may parse as code.
+    if (best?.i && destination !== source.start && above + 1 < destination && !ours(above + 1)) { destination = above + 1; after = true; }
     if (!best || destination === source.start && best.raw === source.raw) return null;
     return { destination, after, raw: best.raw, ref: best.ref, deeper: !!best.deeper };
   },
@@ -22281,8 +22290,8 @@ const liveFacet = Facet.define({ combine: v => v.length > 0 && !!v[v.length - 1]
 /* ---------- widgets ---------- */
 
 class RenderW extends WidgetType {
-  constructor(src, block) { super(); this.src = src; this.block = block; }
-  eq(o) { return o.src === this.src && o.block === this.block; }
+  constructor(src, block, embedSide = null) { super(); this.src = src; this.block = block; this.embedSide = embedSide; }
+  eq(o) { return o.src === this.src && o.block === this.block && o.embedSide === this.embedSide; }
   toDOM(view) {
     let el;
     if (this.block) {
@@ -22290,6 +22299,7 @@ class RenderW extends WidgetType {
       $$('[data-off]', el).forEach(n => n.removeAttribute('data-off'));
     } else {
       el = h('span', { class: 'mx-live-inline', html: DOMPurify.sanitize(md.parseInline(this.src), { ALLOWED_URI_REGEXP: URI_OK }) });
+      if (this.embedSide !== null) el.mxEmbed = { length: this.src.length, after: this.embedSide === 1 };
     }
     App.postProcess(el, App.pathForView(view), 0);
     // Chromium does not toggle <details> inside the editable document, so summaries are toggled by hand.
@@ -22298,6 +22308,7 @@ class RenderW extends WidgetType {
       if (sum && sum.parentElement.tagName === 'DETAILS') { e.preventDefault(); sum.parentElement.open = !sum.parentElement.open; }
     });
     el.addEventListener('mousedown', e => {
+      if (e.button === 2 && (App.linkAt(e.target) || e.target.closest('img[data-vault-path]'))) e.preventDefault();   // a menu opens; a moved caret would reveal the source under the pointer
       if (e.button > 1) return;
       if (e.target.closest('.copy-code-button, .mx-inline-copy, .mx-copyable')) { e.preventDefault(); e.stopPropagation(); return; }
       const img = e.target.closest('img[data-vault-path]');
@@ -22461,9 +22472,9 @@ function buildLive(state) {
   const hide = (from, to) => { if (to > from && !findIn(from, to)) out.push(Decoration.replace({}).range(from, to)); };
   const lineCls = (pos, cls, attributes) => out.push(Decoration.line({ class: cls, attributes }).range(doc.lineAt(pos).from));
   const mark = (from, to, cls, attributes) => { if (to > from) out.push(Decoration.mark({ class: cls, attributes }).range(from, to)); };
-  const block = (from, to) => {
+  const block = (from, to, W = RenderW) => {
     const a = doc.lineAt(from).from, b = doc.lineAt(Math.max(from, to - 1)).to;
-    out.push(Decoration.replace({ widget: new RenderW(doc.sliceString(a, b), true), block: true }).range(a, b));
+    out.push(Decoration.replace({ widget: W === RenderW ? new RenderW(doc.sliceString(a, b), true) : new W(doc.sliceString(a, b)), block: true }).range(a, b));
   };
 
   // The background parser may lag or stop (time budget, crashed worker); finish the tree here so a region never
@@ -22501,9 +22512,9 @@ function buildLive(state) {
           return;
         case 'WikiEmbed': case 'Image': {
           const src = doc.sliceString(n.from, n.to);
-          if (!touches(n.from, n.to) && !findIn(n.from, n.to)) { out.push(Decoration.replace({ widget: new RenderW(src, false) }).range(n.from, n.to)); return false; }
+          if (!touches(n.from, n.to) && !findIn(n.from, n.to)) { out.push(Decoration.replace({ widget: new RenderW(src, false, 0) }).range(n.from, n.to)); return false; }
           // Like Obsidian, an image stays visible after its source while the caret is on it.
-          if (n.name === 'Image' || /\.(png|jpe?g|gif|webp|bmp|avif|svg)(\|[^\]]*)?\]\]$/i.test(src)) out.push(Decoration.widget({ widget: new RenderW(src, false), side: 1 }).range(n.to));
+          if (n.name === 'Image' || /\.(png|jpe?g|gif|webp|bmp|avif|svg)(\|[^\]]*)?\]\]$/i.test(src)) out.push(Decoration.widget({ widget: new RenderW(src, false, 1), side: 1 }).range(n.to));
           return;
         }
         case 'Link': {
@@ -22565,7 +22576,7 @@ function buildLive(state) {
           if (!isActive(n.from, n.to)) hide(n.from, doc.sliceString(n.to, n.to + 1) === ' ' ? n.to + 1 : n.to);
           return;
         case 'CodeBlock': case 'FencedCode': case 'Table': case 'Frontmatter':
-          if (name !== 'CodeBlock' && !isActive(n.from, n.to) && !findInBlock(n.from, n.to) && !hasAncestor(node, ['Blockquote', 'ListItem'])) { block(n.from, n.to); return false; }
+          if (name !== 'CodeBlock' && !isActive(n.from, n.to) && !findInBlock(n.from, n.to) && !hasAncestor(node, ['Blockquote', 'ListItem'])) { block(n.from, n.to, name === 'Table' ? TableW : RenderW); return false; }
           if (name === 'FencedCode' || name === 'CodeBlock') {
             for (let l = doc.lineAt(n.from); ; l = doc.line(l.number + 1)) {
               lineCls(l.from, 'HyperMD-codeblock');
@@ -22707,6 +22718,7 @@ const liveField = StateField.define({
 // Clicking a rendered link / tag in Live Preview follows it instead of placing the caret.
 const liveHandlers = EditorView.domEventHandlers({
   mousedown(e, view) {
+    if (e.button === 2 && e.target.closest?.('.mx-live-link')) { e.preventDefault(); return true; }   // the link menu opens; the source stays hidden
     if (e.button > 1) return false;
     const tag = e.target.closest?.('.mx-live-tag');
     if (tag) { e.preventDefault(); App.openSearch('#' + tag.dataset.tag); return true; }
@@ -22726,6 +22738,192 @@ const liveHandlers = EditorView.domEventHandlers({
     return true;
   },
 });
+
+/* ===== src/js/66-table.js ===== */
+/* ---------- Live Preview tables: edit one cell in place ----------
+   A click in a cell of a rendered table turns just that cell into a plain-text field holding the cell's Markdown;
+   the table stays rendered (like Obsidian). Every keystroke is a normal CodeMirror change of that cell's source
+   (undo, autosave), and the widget keeps its DOM while `el.mxSrc` equals its source, so the field keeps focus.
+   Tab/Shift+Tab, Enter and the arrow keys move between cells (Enter on the last row adds a row); Escape, or an
+   arrow out of the table, returns to the editor. Pipes typed in a cell are escaped. */
+const TableEdit = {
+  // Cell content ranges of one table line (relative to it) and whether the line ends with a pipe.
+  cells(line) {
+    const out = [], n = line.length;
+    let i = 0;
+    while (i < n && (line[i] === ' ' || line[i] === '\t')) i++;
+    if (line[i] === '|') i++;
+    let start = i;
+    for (; i < n; i++) {
+      if (line[i] === '\\') { i++; continue; }
+      if (line[i] === '|') { out.push({ from: start, to: i }); start = i + 1; }
+    }
+    const rest = line.slice(start), trail = out.length > 0 && !rest.trim();
+    if (!trail) out.push({ from: start, to: n });
+    return { cells: out, trail };
+  },
+  lineOf: r => r === 0 ? 0 : r + 1,   // DOM row -> source line (line 1 is the delimiter row)
+  unescape: s => s.trim().replace(/\\\|/g, '|'),
+  escape: s => s.replace(/\r?\n/g, ' ').replace(/(?<!\\)\|/g, '\\|'),
+
+  // The change (relative to src) that sets cell (r, c) to text t.
+  write(src, r, c, t) {
+    const lines = src.split('\n'), li = this.lineOf(r);
+    let off = 0;
+    for (let k = 0; k < li; k++) off += lines[k].length + 1;
+    const line = lines[li], { cells, trail } = this.cells(line), v = this.escape(t);
+    if (c < cells.length) {
+      const cl = cells[c], old = line.slice(cl.from, cl.to), last = c === cells.length - 1 && !trail;
+      const lead = old.trim() ? old.match(/^\s*/)[0] || ' ' : ' ', tail = old.trim() ? old.match(/\s*$/)[0] || (last ? '' : ' ') : (last ? '' : ' ');
+      return { from: off + cl.from, to: off + cl.to, insert: v ? lead + v + tail : old.trim() ? ' ' : old };
+    }
+    const blanks = c - cells.length;
+    const insert = trail ? '  |'.repeat(blanks) + ` ${v} |` : ' |'.repeat(blanks) + ` | ${v}`;
+    return { from: off + line.length, to: off + line.length, insert };
+  },
+
+  rows: el => $$('tr', el.querySelector('table') || el),
+  addr(cell) {
+    const tr = cell.parentElement, rows = this.rows(cell.closest('.mx-live-block'));
+    return { r: rows.indexOf(tr), c: [...tr.children].indexOf(cell) };
+  },
+  // Source text of a cell, as shown while editing.
+  rawOf(src, r, c) {
+    const line = src.split('\n')[this.lineOf(r)] || '', cl = this.cells(line).cells[c];
+    return cl ? this.unescape(line.slice(cl.from, cl.to)) : '';
+  },
+  // Raw offset matching a prefix of the rendered text: markup characters are skipped.
+  align(raw, prefix) {
+    let i = 0;
+    for (const ch of prefix) {
+      while (i < raw.length && raw[i] !== ch) i++;
+      if (i >= raw.length) return raw.length;
+      i++;
+    }
+    return i;
+  },
+  caret(cell, at) {
+    const node = cell.firstChild, sel = getSelection();
+    if (node?.nodeType === 3) sel.collapse(node, Math.min(at, node.length)); else sel.collapse(cell, 0);
+  },
+  // The table's start in the doc, or -1 when the doc no longer holds the source this DOM shows.
+  posOf(view, el) {
+    if (!el.isConnected || !view.contentDOM.contains(el)) return -1;
+    const pos = view.posAtDOM(el);
+    return view.state.doc.sliceString(pos, pos + el.mxSrc.length) === el.mxSrc ? pos : -1;
+  },
+
+  start(view, el, cell, at = Infinity) {
+    if (cell.isContentEditable) return this.caret(cell, at);
+    const { r, c } = this.addr(cell), raw = this.rawOf(el.mxSrc, r, c);
+    cell.textContent = raw;
+    cell.contentEditable = 'plaintext-only';
+    cell.spellcheck = view.contentDOM.spellcheck;
+    cell.classList.add('mx-cell-edit');
+    cell.focus({ preventScroll: true });
+    this.caret(cell, at);
+    cell.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    view.requestMeasure();
+  },
+  finish(view, cell) {
+    if (!cell.isContentEditable) return;
+    const t = cell.textContent;
+    cell.removeAttribute('contenteditable');
+    cell.classList.remove('mx-cell-edit');
+    cell.innerHTML = DOMPurify.sanitize(md.parseInline(t), { ALLOWED_URI_REGEXP: URI_OK });
+    App.postProcess(cell, App.pathForView(view), 0);
+    view.requestMeasure();
+  },
+  input(view, el, cell) {
+    let t = cell.textContent;
+    if (/[\r\n]/.test(t)) { t = t.replace(/\r?\n/g, ' '); cell.textContent = t; this.caret(cell, t.length); }
+    const pos = this.posOf(view, el);
+    if (pos < 0 || view.state.readOnly) return cell.blur();
+    const { r, c } = this.addr(cell), ch = this.write(el.mxSrc, r, c, t);
+    el.mxSrc = el.mxSrc.slice(0, ch.from) + ch.insert + el.mxSrc.slice(ch.to);
+    view.dispatch({ changes: { from: pos + ch.from, to: pos + ch.to, insert: ch.insert }, userEvent: 'input.type' });
+    view.requestMeasure();
+  },
+  // After a change that re-renders the table (new row, undo): edit cell (r, c) of the table now at pos.
+  refocus(view, pos, r, c) {
+    const el = [...view.contentDOM.querySelectorAll(':scope > .mx-live-block')].find(b => b.mxSrc != null && view.posAtDOM(b) === pos);
+    const rows = el ? this.rows(el) : [], row = rows[Math.max(0, Math.min(r, rows.length - 1))], cell = row?.children[Math.min(c, row.children.length - 1)];
+    if (cell) this.start(view, el, cell); else view.focus();
+  },
+  leave(view, el, cell, after) {
+    const pos = this.posOf(view, el), end = pos + el.mxSrc.length, len = view.state.doc.length;
+    cell.blur();
+    view.focus();
+    if (pos < 0) return;
+    if (!after) return view.dispatch({ selection: { anchor: Math.max(0, pos - 1) }, scrollIntoView: true });
+    if (end < len) return view.dispatch({ selection: { anchor: end + 1 }, scrollIntoView: true });
+    view.dispatch({ selection: { anchor: len }, effects: afterBlockEffect.of(true), scrollIntoView: true });
+  },
+  keydown(view, el, cell, e) {
+    if (e.isComposing) return;
+    const mod = e.ctrlKey || e.metaKey, k = e.key, rows = this.rows(el), { r, c } = this.addr(cell);
+    const go = (rr, cc, at) => { const row = rows[rr]; this.start(view, el, row.children[Math.min(cc, row.children.length - 1)], at); };
+    let done = true;
+    if (mod && !e.altKey && (e.code === 'KeyZ' || e.code === 'KeyY')) {
+      const pos = this.posOf(view, el);
+      if (pos < 0) return;
+      (e.code === 'KeyY' || e.shiftKey ? CM.redo : CM.undo)(view);
+      if (this.posOf(view, el) < 0) this.refocus(view, pos, r, c);
+      else { const raw = this.rawOf(el.mxSrc, r, c); if (cell.textContent !== raw) { cell.textContent = raw; this.caret(cell, raw.length); } }
+    } else if (mod || e.altKey) done = false;
+    else if (k === 'Tab') {
+      const n = rows[r].children.length;
+      if (!e.shiftKey) { if (c + 1 < n) go(r, c + 1); else if (r + 1 < rows.length) go(r + 1, 0); else this.leave(view, el, cell, true); }
+      else if (c > 0) go(r, c - 1); else if (r > 0) go(r - 1, rows[r - 1].children.length - 1); else this.leave(view, el, cell, false);
+    } else if (k === 'Enter' && !e.shiftKey) {
+      if (r + 1 < rows.length) go(r + 1, c);
+      else {   // last row: a new empty row below, same column
+        const pos = this.posOf(view, el);
+        if (pos < 0 || view.state.readOnly) return;
+        const cols = rows[0].children.length, end = pos + el.mxSrc.length;
+        view.dispatch({ changes: { from: end, insert: '\n|' + '  |'.repeat(cols) }, userEvent: 'input', annotations: CM.isolateHistory.of('full') });   // its own undo step
+        this.refocus(view, pos, r + 1, c);
+      }
+    } else if (k === 'Enter') done = true;   // no line breaks inside a cell
+    else if (k === 'ArrowUp' && !e.shiftKey) { if (r > 0) go(r - 1, c); else this.leave(view, el, cell, false); }
+    else if (k === 'ArrowDown' && !e.shiftKey) { if (r + 1 < rows.length) go(r + 1, c); else this.leave(view, el, cell, true); }
+    else if (k === 'Escape' && !e.shiftKey) this.leave(view, el, cell, true);
+    else done = false;
+    if (done) { e.preventDefault(); e.stopPropagation(); }
+  },
+
+  // Wire a rendered table block (called from TableW.toDOM).
+  bind(view, el, src) {
+    el.mxSrc = src;
+    const lines = src.split('\n').length, rows = this.rows(el);
+    const editable = rows.length > 0 && rows.length === lines - 1;   // the rendering must map row by row onto the source
+    el.addEventListener('mousedown', e => {
+      const cell = e.target.closest?.('td, th');
+      if (!cell || !el.contains(cell) || e.button !== 0) return;
+      if (cell.isContentEditable) { e.stopImmediatePropagation(); return; }   // the browser places the caret
+      if (!editable || view.state.readOnly || e.target.closest('a, img, input, button, .mx-copyable, .mx-inline-copy')) return;
+      const { r, c } = this.addr(cell), raw = this.rawOf(el.mxSrc, r, c), hit = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+      let at = raw.length;
+      if (hit && cell.contains(hit.startContainer)) {
+        const pre = document.createRange();
+        pre.selectNodeContents(cell); pre.setEnd(hit.startContainer, hit.startOffset);
+        at = this.align(raw, pre.toString());
+      }
+      e.preventDefault(); e.stopImmediatePropagation();
+      this.start(view, el, cell, at);
+    }, true);
+    el.addEventListener('input', e => { const cell = e.target.closest?.('.mx-cell-edit'); if (cell) this.input(view, el, cell); });
+    el.addEventListener('keydown', e => { const cell = e.target.closest?.('.mx-cell-edit'); if (cell) this.keydown(view, el, cell, e); });
+    el.addEventListener('focusout', e => { const cell = e.target.closest?.('.mx-cell-edit'); if (cell) this.finish(view, cell); });
+  },
+};
+
+class TableW extends RenderW {
+  constructor(src) { super(src, true); }
+  toDOM(view) { const el = super.toDOM(view); TableEdit.bind(view, el, this.src); return el; }
+  // Our own cell edits already show in this DOM: keep it (and the focused cell).
+  updateDOM(dom) { return dom.mxSrc === this.src; }
+}
 
 /* ===== src/js/70-favorites.js ===== */
 /* ---------- Maxidian favorites, seeded from read-only Obsidian bookmarks ----------
@@ -24536,13 +24734,15 @@ const App = {
     ]);
   },
 
-  imageMenu(e, p) {
+  imageMenu(e, p, img = null) {
+    const src = this.imageSource(img);
     this.menu(e, [
       { hint: p },
       { title: 'Open image', icon: 'file-text', fn: () => this.openOtherFile(p) },
       { title: 'Copy image', icon: 'clipboard-list', fn: () => this.copyImage(p) },
       { title: 'Reveal in file tree', icon: 'folder-open', fn: () => this.revealFile(p) },
       { title: 'Copy path', icon: 'link', fn: () => this.copyPath(p) },
+      ...(src ? [{ title: 'Remove from note…', icon: 'x', fn: () => this.removeImage(src, p) }] : []),
     ]);
   },
 
@@ -24551,16 +24751,24 @@ const App = {
     const list = [...(img.closest('.cm-content, .markdown-preview-sizer') || img.parentElement).querySelectorAll('img[data-vault-path]')];
     let i = Math.max(0, list.indexOf(img));
     const pic = h('img', { class: 'mx-lightbox-img' }), cap = h('div', { class: 'mx-lightbox-caption' });
+    const stage = h('div', { class: 'mx-lightbox-stage' }, pic);
+    const del = h('button', { type: 'button', class: 'mx-lightbox-remove', title: 'Remove from note (Delete)', onclick: () => remove() }, 'Remove from note…');
+    let src = null;
+    const remove = () => { if (!src) return; const p = pic.dataset.vaultPath, s = src; close(); this.removeImage(s, p); };
     const show = () => {
       const cur = list[i] || img;
-      pic.src = cur.src; pic.dataset.vaultPath = cur.dataset.vaultPath; pic.classList.remove('is-zoomed');
-      cap.textContent = cur.dataset.vaultPath + (list.length > 1 ? `  ·  ${i + 1} / ${list.length}` : '');
+      pic.src = cur.src; pic.alt = cur.alt; pic.dataset.vaultPath = cur.dataset.vaultPath; pic.mxSource = cur; pic.classList.remove('is-zoomed');
+      stage.scrollTo(0, 0);
+      cap.title = cap.textContent = cur.dataset.vaultPath + (list.length > 1 ? `  ·  ${i + 1} / ${list.length}` : '');
+      src = this.imageSource(cur); del.hidden = !src;
     };
     const close = () => { wrap.remove(); this.modalOpen = null; };
-    const wrap = h('div', { class: 'mx-lightbox', tabindex: '-1' }, pic, cap);
-    wrap.addEventListener('click', e => { if (e.target === pic) pic.classList.toggle('is-zoomed'); else close(); });
+    const wrap = h('div', { class: 'mx-lightbox', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Image preview', tabindex: '-1' },
+      stage, h('div', { class: 'mx-lightbox-bar' }, cap, del));
+    wrap.addEventListener('click', e => { if (e.target === pic) pic.classList.toggle('is-zoomed'); else if (!e.target.closest('.mx-lightbox-bar')) close(); });
     wrap.addEventListener('keydown', e => {
       if (e.key === 'Escape') { e.stopPropagation(); close(); }
+      else if (e.key === 'Delete') { e.preventDefault(); remove(); }
       else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && list.length > 1) { e.preventDefault(); i = (i + (e.key === 'ArrowLeft' ? -1 : 1) + list.length) % list.length; show(); }
     });
     show(); document.body.append(wrap); wrap.focus();
@@ -26759,10 +26967,12 @@ Object.assign(App, {
     $('#st-changes').addEventListener('click', e => this.chooseChanges(e));
 
     E.preview.addEventListener('click', e => this.onPreviewClick(e));
-    // Right-click on any vault image (reading, Live Preview, split, viewer) opens the image menu.
+    // Right-click on any vault image (reading, Live Preview, split, viewer) opens the image menu, on a rendered link the link menu.
     document.addEventListener('contextmenu', e => {
       const img = e.target.closest?.('img[data-vault-path]');
-      if (img) { e.preventDefault(); e.stopPropagation(); this.imageMenu(e, img.dataset.vaultPath); }
+      if (img) { e.preventDefault(); e.stopPropagation(); this.imageMenu(e, img.dataset.vaultPath, img.mxSource || img); return; }
+      const a = this.linkAt(e.target);
+      if (a) this.linkMenu(e, a);
     }, true);
     E.preview.addEventListener('auxclick', e => { if (e.button === 1 && e.target.closest('a.internal-link')) { e.preventDefault(); this.followLink(e.target.closest('a').dataset.href, { newTab: true }); } });
 
@@ -28844,6 +29054,112 @@ Object.assign(App, {
     };
     more.addEventListener('click', open);
     more.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(ev); } });
+  },
+});
+
+/* ===== src/js/98-embedmenu.js ===== */
+/* Right-click menu of rendered links, and "Remove from note" for images (image menu and viewer). */
+Object.assign(App, {
+  // Pane that shows el: { doc, view } in Editing view, { doc, preview } in Reading view, else null.
+  paneOf(el) {
+    for (const view of [Editor.view, Split.view]) if (view?.contentDOM.contains(el)) { const doc = this.docForView(view); return doc && { doc, view }; }
+    if (this.el.preview.contains(el)) return this.cur && { doc: this.cur, preview: this.el.preview };
+    if (Split.preview?.contains(el)) return Split.doc && { doc: Split.doc, preview: Split.preview };
+    return null;
+  },
+
+  /* ----- links ----- */
+
+  linkAt(el) { return el.closest?.('.cm-content .mx-live-link, .cm-content a[href]:not(.tag), .markdown-preview-sizer a[href]:not(.tag)'); },
+
+  linkMenu(e, a) {
+    const pane = this.paneOf(a), sel = getSelection();
+    if (!pane || (!sel.isCollapsed && sel.containsNode(a, true))) return false;   // selected text keeps the browser's menu
+    e.preventDefault(); e.stopPropagation();
+    const live = a.classList.contains('mx-live-link'), internal = a.classList.contains('internal-link'), from = pane.doc.path;
+    const raw = live || internal ? a.dataset.href || '' : a.getAttribute('href') || '';
+    const clean = raw.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').trim();
+    const ext = internal ? null : !live ? clean : a.dataset.wiki ? (SCHEME_RE.test(clean) ? clean : null) : externalUrl(raw);
+    const items = [{ hint: ext || safeDecode(raw) }];
+    if (ext) {
+      items.push({ title: 'Copy link', icon: 'link', fn: async () => toast(await copyText(ext) ? 'Copied link' : 'Copy failed') },
+        { title: 'Open link', icon: 'arrow-right', fn: () => this.openExternal(ext) });
+    } else {
+      const href = safeDecode(raw), [lp, sub] = this.splitLink(href), f = lp ? this.vault.resolve(lp, from) : null;
+      const wiki = '[[' + (f ? this.vault.linkText(f, from) : lp) + (sub ? '#' + sub : '') + ']]';
+      items.push({ title: 'Copy link', icon: 'link', fn: async () => toast(await copyText(wiki) ? 'Copied link' : 'Copy failed') });
+      if (f) items.push({ title: 'Copy path', icon: 'link', fn: () => this.copyPath(f.path) });
+      items.push({ title: lp ? 'Open in new tab' : 'Go to heading', icon: lp ? 'file-text' : 'arrow-right', fn: () => this.followLink(href, { newTab: true, fromPath: from }) });
+    }
+    // Links drawn inside a rendered block (table, callout) have no position of their own.
+    if (live && !pane.doc.readOnly) items.push({ title: 'Edit link', icon: 'pencil', fn: () => {
+      if (!a.isConnected) return;
+      pane.view.focus();
+      pane.view.dispatch({ selection: { anchor: pane.view.posAtDOM(a) }, scrollIntoView: true });
+    } });
+    this.menu(e, items);
+    return true;
+  },
+
+  /* ----- images ----- */
+
+  // Where the rendered image's embed is in the source: { doc, text, from, to }, or null unless it is unmistakable.
+  imageSource(img) {
+    const pane = img?.isConnected ? this.paneOf(img) : null;
+    if (!pane || pane.doc.readOnly || img.closest('.markdown-embed')) return null;   // embedded notes are another file
+    const { doc, view, preview } = pane, state = view ? view.state : doc.state || (doc.state = Editor.newState(doc));
+    const text = state.doc.toString();
+    if (text !== doc.text) return null;
+    let from, to, root, inline = false;
+    if (view) {
+      root = img.closest('.mx-live-inline, .mx-live-block');
+      if (!root) return null;
+      const pos = view.posAtDOM(root);
+      inline = root.matches('.mx-live-inline');
+      if (inline) {
+        const embed = root.mxEmbed;
+        if (!embed) return null;
+        from = embed.after ? pos - embed.length : pos;
+        to = from + embed.length;
+      } else ({ from, to } = view.lineBlockAt(pos));
+    } else {
+      const blocks = $$(':scope > [data-off]', preview), i = blocks.findIndex(b => b.contains(img));
+      if (i < 0) return null;
+      root = blocks[i]; from = +root.dataset.off; to = i + 1 < blocks.length ? +blocks[i + 1].dataset.off - 1 : text.length;
+    }
+    const tree = CM.ensureSyntaxTree(state, to, 200), own = [];
+    if (!tree) return null;
+    tree.iterate({ from, to, enter: n => {
+      if ((n.name !== 'WikiEmbed' && n.name !== 'Image') || n.from < from || n.to > to) return;
+      if (inline && (n.from !== from || n.to !== to)) return;
+      const url = n.name === 'Image' ? n.node.getChild('URL') : null;
+      const target = n.name === 'WikiEmbed' ? text.slice(n.from + 3, n.to - 2).split('|')[0].trim() : url ? safeDecode(text.slice(url.from, url.to).replace(/^<|>$/g, '')) : '';
+      const f = target && (this.vault.resolve(target, doc.path) || this.vault.resolve(this.splitLink(target)[0], doc.path));
+      if (f && f.path === img.dataset.vaultPath) own.push({ from: n.from, to: n.to });
+    } });
+    let hit = own[0];
+    if (!inline) {   // n-th copy of this picture in the block; raw HTML or anything else that breaks the count means no guess
+      const imgs = $$('img[data-vault-path]', root).filter(x => !x.closest('.markdown-embed') && x.dataset.vaultPath === img.dataset.vaultPath);
+      hit = imgs.length === own.length ? own[imgs.indexOf(img)] : null;
+    }
+    return hit ? { doc, text, from: hit.from, to: hit.to, reading: !!preview } : null;
+  },
+
+  async removeImage(src, path) {
+    if (!await this.confirm('Remove image from note?', `Remove "${basename(path)}" from this note? Ctrl+Z in Editing view brings it back. The image file stays in the vault.`, 'Remove')) return;
+    const { doc, text } = src;
+    if (doc.text !== text || doc.state?.doc.toString() !== text || (doc !== this.cur && doc !== Split.doc)) return toast('Note changed; image not removed');
+    let { from, to } = src;
+    const start = text.lastIndexOf('\n', from - 1) + 1, nl = text.indexOf('\n', to), end = nl < 0 ? text.length : nl;
+    if (from > 0 && !(text.slice(start, from) + text.slice(to, end)).trim() || from === 0 && !text.slice(to, end).trim()) {   // alone on its line: the line goes too
+      from = from > 0 ? start : 0; to = end;
+      if (nl >= 0) to++; else if (from) from--;
+    }
+    const next = text.slice(0, from) + text.slice(to), reading = doc === Split.doc ? Split.reading : this.el.reading, top = reading.scrollTop;
+    Editor.setText(doc, next);
+    doc.text = next; this.markDirty(doc);
+    if (src.reading) { if (doc === Split.doc) Split.renderPreview(); else this.renderPreview(); }
+    reading.scrollTop = top;
   },
 });
 
